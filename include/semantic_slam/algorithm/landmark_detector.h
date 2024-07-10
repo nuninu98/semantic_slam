@@ -34,6 +34,9 @@ class LandmarkDetector{
 
         //vector<SemanticMeasurement> detectObject(const cv::Mat& rgb_image);
         vector<Detection> detectObjectMRCNN(const cv::Mat& rgb_image);
+        
+        void detectObjectYOLO(const cv::Mat& rgb_image);
+        
         vector<string> getClassNames() const;
 };
 #endif

@@ -39,7 +39,9 @@ void SemanticSLAM::imageCallback(const sensor_msgs::ImageConstPtr& rgb_image, co
     cv_bridge::CvImageConstPtr cv_depth_bridge = cv_bridge::toCvShare(depth_image, depth_image->encoding);
    
     Eigen::Matrix4d cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec()).matrix().cast<double>();
-    vector<Detection> detections = ld_.detectObjectMRCNN(cv_rgb_bridge->image);
+    vector<Detection> detections;
+    detections = ld_.detectObjectMRCNN(cv_rgb_bridge->image);
+    //ld_.detectObjectYOLO(cv_rgb_bridge->image);
     cv::Mat detection_img = cv_rgb_bridge->image.clone();
 
     for(const auto& m : detections){
