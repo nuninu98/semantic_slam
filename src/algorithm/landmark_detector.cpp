@@ -12,72 +12,111 @@ LandmarkDetector::LandmarkDetector(): pnh_("~"){
     while(getline(ifs, line)){
         class_names_.push_back(line);
     }
-    network_ = cv::dnn::readNetFromTensorflow(model_weights, text_graph);
-    //network_ = cv::dnn::readNetFromDarknet("/home/nuninu98/catkin_ws/src/orb_semantic_slam/model/yolov3.cfg", "/home/nuninu98/catkin_ws/src/orb_semantic_slam/model/yolov3.weights");
-    network_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-    network_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+    
+    //===========MASK RCNN=============
+    // network_ = cv::dnn::readNetFromTensorflow(model_weights, text_graph);
+    // last_layer_names_ = {"detection_out_final", "detection_masks"};
+    //============YOLOv8===============
+    network_ = cv::dnn::readNetFromONNX("/home/nuninu98/Downloads/yolov8n-cls.onnx");
+    last_layer_names_ = network_.getUnconnectedOutLayersNames();  
+    //=================================
+
+    // network_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+    // network_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+
+    network_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+    network_.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+
     // vocabulary_.reset(new DBoW2::TemplatedVocabulary<DBoW2::FORB::TDescriptor, DBoW2::FORB>());
     // vocabulary_->loadFromTextFile(voc_file_path);
-    //last_layer_names_ = network_.getUnconnectedOutLayersNames();    
-    last_layer_names_ = {"detection_out_final", "detection_masks"};
+    
 
 }
 
 LandmarkDetector::~LandmarkDetector(){
 }
 
-void LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image){
-    cv::Mat blob = cv::dnn::blobFromImage(rgb_image, 1.0 /255.0, cv::Size(640, 640), cv::Scalar(0, 0, 0), true, false);
+cv::Mat LandmarkDetector::formatToSquare(const cv::Mat& source){
+    int col = source.cols;
+    int row = source.rows;
+    int _max = MAX(col, row);
+    cv::Mat result = cv::Mat::zeros(_max, _max, CV_8UC3);
+    source.copyTo(result(cv::Rect(0, 0, col, row)));
+    return result;
+}
+
+vector<Detection> LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image){
+    vector<Detection> objects;
+    cv::Mat model_input = rgb_image;
+
+    model_input = formatToSquare(model_input);
+    cv::Size model_shape = cv::Size(224, 224); // model size
+    cv::Mat blob = cv::dnn::blobFromImage(model_input, 1.0 /255.0, model_shape, cv::Scalar(), true, false);
+    
+    // cv::Size model_shape = rgb_image.size();
+    // cv::Mat blob = cv::dnn::blobFromImage(model_input, 1.0 /255.0, model_shape, cv::Scalar(), true, false);
     network_.setInput(blob);
     //========================Simple detection=======================
     vector<cv::Mat> outputs;
-
-    vector<int> class_ids;
-    vector<float> confidences;
-    vector<cv::Rect> boxes;
     network_.forward(outputs, last_layer_names_);
-    for(size_t i = 0; i < outputs.size(); i++){
-        float* data = (float*)outputs[i].data;
-        for(size_t r = 0; r < outputs[i].rows; r++, data += outputs[i].cols){
-            cv::Mat scores = outputs[i].row(r).colRange(5, outputs[i].cols);
-            cv::Point class_id_pt;
-            double conf = 0.0;
-            cv::minMaxLoc(scores, 0, &conf, 0, &class_id_pt);
-            if(conf > CONFIDENCE_THRESHOLD){
-                int center_x = data[0] * rgb_image.cols;
-                int center_y = data[1] * rgb_image.rows;
-                int width = data[2] * rgb_image.cols;
-                int height = data[3] * rgb_image.rows;
-                int left = center_x - width / 2;
-                int top = center_y - height / 2;
-                if(width * height < 50){
-                    continue;
-                }
-                class_ids.push_back(class_id_pt.x);
-                confidences.push_back(float(conf));
-                cv::Rect roi = cv::Rect(left, top, width, height);
-                boxes.push_back(roi);
-               
+    int rows = outputs[0].size[1];
+    int dimensions = outputs[0].size[2];
+    bool yolov8 = false;
+    if(dimensions > rows){
+        yolov8 = true;
+        rows = outputs[0].size[2];
+        dimensions = outputs[0].size[1];
+        outputs[0] = outputs[0].reshape(1, dimensions);
+        cv::transpose(outputs[0], outputs[0]);
+    }
+
+    float* data = (float*)outputs[0].data;
+    float x_factor = model_input.cols / model_shape.width;
+    float y_factor = model_input.rows / model_shape.height;
+
+    std::vector<int> class_ids;
+    std::vector<float> confidences;
+    std::vector<cv::Rect> boxes;
+
+    for(int i = 0; i < rows; ++i){
+        if(yolov8){
+            float* classes_scores = data + 4;
+            int classes_num = 80;
+            cv::Mat scores(1, classes_num, CV_32FC1, classes_scores);
+            cv::Point class_id;
+            double max_class_score;
+            cv::minMaxLoc(scores, 0, &max_class_score, 0, &class_id);
+            if(max_class_score > CONFIDENCE_THRESHOLD){
+                confidences.push_back(max_class_score);
+                class_ids.push_back(class_id.x);
+
+                float x = data[0];
+                float y = data[1];
+                float w = data[2];
+                float h = data[3];
+
+                int left = int((x - 0.5 * w) * x_factor);
+                int top = int((y - 0.5 * h) * y_factor);
+                int width = int(w * x_factor);
+                int height = int(h * y_factor);
+
+                boxes.push_back(cv::Rect(left, top, width, height));
             }
         }
-    }
-    // cv::Mat detection_image = rgb_image.clone();
-    // vector<int> indices;
-    // cv::Rect image_size(0, 0, rgb_image.cols, rgb_image.rows);
-    // cv::dnn::NMSBoxes(boxes, confidences, CONFIDENCE_THRESHOLD, 0.4, indices);
-    // for(const auto& id : indices){
-    //     cv::Rect roi = boxes[id] & image_size;
-    //     cv::rectangle(detection_image, cv::Point(roi.x, roi.y), cv::Point(roi.x + roi.width, roi.y + roi.height), cv::Scalar(0, 255, 0), 2);
-    //     cv::putText(detection_image, COCO_NAMES[class_ids[id]]+" : "+to_string(confidences[id]), cv::Point(roi.x, roi.y), 1, 2, cv::Scalar(255, 255, 0));
-    //     SemanticMeasurement obj(roi);
-    //     obj.score = confidences[id];
-    //     //obj.id = class_ids[id];
-    //     obj.class_name = COCO_NAMES[class_ids[id]];
-    //     cv::Mat crop_img = rgb_image(roi).clone();
-    //     //(*semantic_vocabulary_)[obj.class_name].transform(obj.descriptor, obj.bow_vector);
+        else{
 
-    //     objects.push_back(obj);
-    // }
+        }
+        data += dimensions;
+    }
+    vector<int> nms_result;
+    cv::dnn::NMSBoxes(boxes, confidences, CONFIDENCE_THRESHOLD, NMS_TRESHOLD, nms_result);
+    for(int i = 0; i < nms_result.size(); ++i){
+        int idx = nms_result[i];
+        Detection detection(boxes[idx], cv::Mat(), class_ids[idx]);
+        objects.push_back(detection);
+    }
+  
+    return objects;
 }
 
 
