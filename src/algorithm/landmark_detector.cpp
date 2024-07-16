@@ -17,7 +17,7 @@ LandmarkDetector::LandmarkDetector(): pnh_("~"){
     // network_ = cv::dnn::readNetFromTensorflow(model_weights, text_graph);
     // last_layer_names_ = {"detection_out_final", "detection_masks"};
     //============YOLOv8===============
-    network_ = cv::dnn::readNetFromONNX("/home/nuninu98/Downloads/yolov8n-cls.onnx");
+    network_ = cv::dnn::readNetFromONNX("/home/nuninu98/Downloads/door_stair_chair_toilet_640.onnx");
     last_layer_names_ = network_.getUnconnectedOutLayersNames();  
     //=================================
 
@@ -50,7 +50,7 @@ vector<Detection> LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image){
     cv::Mat model_input = rgb_image;
 
     model_input = formatToSquare(model_input);
-    cv::Size model_shape = cv::Size(224, 224); // model size
+    cv::Size model_shape = cv::Size(640, 640); // model size
     cv::Mat blob = cv::dnn::blobFromImage(model_input, 1.0 /255.0, model_shape, cv::Scalar(), true, false);
     
     // cv::Size model_shape = rgb_image.size();

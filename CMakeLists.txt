@@ -32,6 +32,9 @@ find_package(Pangolin REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(PCL 1.8 REQUIRED)
 find_package(OpenMP)
+#find_package(tesseract REQUIRED)
+#find_package(cpprestsdk REQUIRED)
+
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
@@ -200,6 +203,13 @@ target_link_libraries(semantic_slam_api
 add_executable(test_semantic_slam src/test_node/test_semantic_slam.cpp)
 target_link_libraries(test_semantic_slam
   semantic_slam_api
+)
+
+add_executable(test_text_detection src/test_node/test_text_detection.cpp)
+target_link_libraries(test_text_detection
+  semantic_slam_api
+  -ltesseract
+  #cpprestsdk::cpprest
 )
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
