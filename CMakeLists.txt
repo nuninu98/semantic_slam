@@ -22,18 +22,17 @@ find_package(catkin REQUIRED COMPONENTS
   message_filters
   nav_msgs
   roscpp
+  rospy
   sensor_msgs
   tf2_ros
   visualization_msgs
 )
 find_package(Eigen3 REQUIRED)
-find_package(OpenCV 4.9.0 REQUIRED)
+find_package(OpenCV 4.7.0 REQUIRED)
 find_package(Pangolin REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(PCL 1.8 REQUIRED)
 find_package(OpenMP)
-#find_package(tesseract REQUIRED)
-#find_package(cpprestsdk REQUIRED)
 
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -137,7 +136,7 @@ message("GTSAM INCLUDE: ${GTSAM_INCLUDE_DIR}")
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES semantic_slam
- CATKIN_DEPENDS cv_bridge geometry_msgs message_filters nav_msgs roscpp sensor_msgs tf2_ros visualization_msgs
+ CATKIN_DEPENDS cv_bridge geometry_msgs message_filters nav_msgs rospy sensor_msgs tf2_ros visualization_msgs
  DEPENDS system_lib
 )
 
@@ -211,6 +210,13 @@ target_link_libraries(test_text_detection
   -ltesseract
   #cpprestsdk::cpprest
 )
+
+add_executable(test_crnn src/test_node/test_crnn.cpp)
+target_link_libraries(test_crnn
+  semantic_slam_api
+  #cpprestsdk::cpprest
+)
+
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use
@@ -235,10 +241,10 @@ target_link_libraries(test_text_detection
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
-# catkin_install_python(PROGRAMS
-#   scripts/my_python_script
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+catkin_install_python(PROGRAMS
+  src/test_node/test_torch_detection.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
 ## Mark executables for installation
 ## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_executables.html

@@ -17,15 +17,16 @@ LandmarkDetector::LandmarkDetector(): pnh_("~"){
     // network_ = cv::dnn::readNetFromTensorflow(model_weights, text_graph);
     // last_layer_names_ = {"detection_out_final", "detection_masks"};
     //============YOLOv8===============
-    network_ = cv::dnn::readNetFromONNX("/home/nuninu98/Downloads/door_stair_chair_toilet_640.onnx");
-    last_layer_names_ = network_.getUnconnectedOutLayersNames();  
+    network_ = cv::dnn::readNetFromONNX("/home/nuninu98/Downloads/yolov8n.onnx");
+    last_layer_names_ = network_.getUnconnectedOutLayersNames();
+
     //=================================
 
-    // network_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-    // network_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+    network_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+    network_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
 
-    network_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
-    network_.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+    // network_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+    // network_.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
 
     // vocabulary_.reset(new DBoW2::TemplatedVocabulary<DBoW2::FORB::TDescriptor, DBoW2::FORB>());
     // vocabulary_->loadFromTextFile(voc_file_path);
@@ -58,7 +59,9 @@ vector<Detection> LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image){
     network_.setInput(blob);
     //========================Simple detection=======================
     vector<cv::Mat> outputs;
+    ros::Time tic = ros::Time::now();
     network_.forward(outputs, last_layer_names_);
+    cout<<"TIME: "<<(ros::Time::now() - tic).toSec()<<endl;
     int rows = outputs[0].size[1];
     int dimensions = outputs[0].size[2];
     bool yolov8 = false;
