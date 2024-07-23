@@ -24,6 +24,8 @@ OCR::OCR(string modelRecognition, string alphabet)
         recognizer->setVocabulary(vocabulary);
         recognizer->setDecodeType("CTC-greedy");
         recognizer->setInputParams(1.0/127.5, Size(100, 32), Scalar(127.5));
+        recognizer->setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+        recognizer->setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
 		// this->recognizer = readNet(modelRecognition);
         // recognizer.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
         // recognizer.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
@@ -133,6 +135,7 @@ void OCR::expandRectangle(const Rect& input, double rate, Rect& output){
 
 void OCR::detect_rec(Mat& frame)
 {
+    Mat frame_copy = frame.clone();
     std::vector<Mat> outs;
     std::vector<String> outNames(2);
     outNames[0] = "feature_fusion/Conv_7/Sigmoid";
@@ -157,6 +160,7 @@ void OCR::detect_rec(Mat& frame)
     Point2f ratio((float)frame.cols / this->inpWidth, (float)frame.rows / this->inpHeight);
     // Render text.
     Rect image_size = Rect(0, 0, frame.cols, frame.rows);
+    #pragma omp parallel for
     for (size_t i = 0; i < indices.size(); ++i)
     {
         RotatedRect& box = boxes[indices[i]];
@@ -190,10 +194,31 @@ void OCR::detect_rec(Mat& frame)
             Rect roi_expand;
             expandRectangle(roi, 0.4, roi_expand);
             //this->fourPointsTransform(frame, vertices, cropped);
-            cropped = frame((roi_expand & image_size));
-            string wordRecognized = recognizer->recognize(cropped);
-            putText(frame, wordRecognized, vertices[1], FONT_HERSHEY_SIMPLEX, 1.5, Scalar(0, 0, 255));
-            rectangle(frame, roi_expand, Scalar(0, 0, 255), 2);
+            #pragma omp critical
+            {
+                cropped = frame((roi_expand & image_size));
+                //=============Test Heq============
+                Mat crop_hsv;
+                cvtColor(cropped, crop_hsv, COLOR_BGR2HSV);
+                vector<Mat> hsv_hist;
+                split(crop_hsv, hsv_hist);
+                equalizeHist(hsv_hist[2], hsv_hist[2]);
+                Mat hsv_eq;
+                merge(hsv_hist, hsv_eq);
+                Mat crop_v_eq;
+                cvtColor(hsv_eq, crop_v_eq, COLOR_HSV2BGR);
+                
+                //=================================
+                string wordRecognized = recognizer->recognize(crop_v_eq);
+                if(all_of(wordRecognized.begin(), wordRecognized.end(), ::isdigit) && !wordRecognized.empty()){
+                    putText(frame_copy, wordRecognized, vertices[1], FONT_HERSHEY_SIMPLEX, 1.5, Scalar(0, 0, 255));
+                    rectangle(frame_copy, roi_expand, Scalar(0, 0, 255), 2);
+                    imshow("Equalized", crop_v_eq);
+                    waitKey(1);
+                }
+                
+            }
+            
             // cvtColor(cropped, cropped, cv::COLOR_BGR2GRAY);
 
             // Mat blobCrop = blobFromImage(cropped, 1.0 / 127.5, Size(), Scalar::all(127.5));
@@ -209,6 +234,10 @@ void OCR::detect_rec(Mat& frame)
         // for (int j = 0; j < 4; ++j)
         //     line(frame, vertices[j], vertices[(j + 1) % 4], Scalar(0, 255, 0), 1);
     }
-    // Put efficiency information.
+
+    string kWinName = "Deep learning object detection in OpenCV";
+    namedWindow(kWinName, WINDOW_NORMAL);
+    imshow(kWinName, frame_copy);
+    waitKey(1);
 
 }

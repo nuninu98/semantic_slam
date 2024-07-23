@@ -14,10 +14,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& image){
     if(ocr != nullptr){
         ocr->detect_rec(frame);
     }
-    string kWinName = "Deep learning object detection in OpenCV";
-    namedWindow(kWinName, WINDOW_NORMAL);
-    imshow(kWinName, frame);
-    waitKey(1);
+   
 }
 
 int main(int argc, char** argv){
