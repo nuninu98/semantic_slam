@@ -14,9 +14,19 @@ OCR::OCR(string modelRecognition, string alphabet)
     detector.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
     if (!modelRecognition.empty())
 	{
-		this->recognizer = readNet(modelRecognition);
-        recognizer.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-        recognizer.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+        ifstream vocFile;
+        vocFile.open(alphabet);
+        string vocLine;
+        while(getline(vocFile, vocLine)){
+            vocabulary.push_back(vocLine);
+        }
+        recognizer.reset(new TextRecognitionModel(modelRecognition));
+        recognizer->setVocabulary(vocabulary);
+        recognizer->setDecodeType("CTC-greedy");
+        recognizer->setInputParams(1.0/127.5, Size(100, 32), Scalar(127.5));
+		// this->recognizer = readNet(modelRecognition);
+        // recognizer.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+        // recognizer.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
 	}	
 }
 
@@ -110,6 +120,17 @@ void OCR::decodeText(const Mat& scores, std::string& text)
     }
 }
 
+void OCR::expandRectangle(const Rect& input, double rate, Rect& output){
+    double w = input.width;
+    double h = input.height;
+    Point center = input.tl() + Point(w/2, h/2);
+    w *= (1.0 + rate);
+    h *= (1.0 + rate);
+    Point topleft = center - Point(w/2 , h/2);
+    output = Rect(topleft.x, topleft.y, w, h);
+}
+
+
 void OCR::detect_rec(Mat& frame)
 {
     std::vector<Mat> outs;
@@ -135,6 +156,7 @@ void OCR::detect_rec(Mat& frame)
 
     Point2f ratio((float)frame.cols / this->inpWidth, (float)frame.rows / this->inpHeight);
     // Render text.
+    Rect image_size = Rect(0, 0, frame.cols, frame.rows);
     for (size_t i = 0; i < indices.size(); ++i)
     {
         RotatedRect& box = boxes[indices[i]];
@@ -149,24 +171,43 @@ void OCR::detect_rec(Mat& frame)
         }
 
         if (!this->modelRecognition.empty())
-        {
+        {   
+            bool valid = true;
+            vector<Point2f> vertices_arr(4);
+            for (int j = 0; j < 4; ++j)
+            {
+                if(vertices[j].x < 0 || vertices[j].y < 0 || vertices[j].x >= frame.cols || vertices[j].y >= frame.rows){
+                    valid = false;
+                    break;
+                }
+                vertices_arr[j] = vertices[j];
+            }
+            if(!valid){
+                continue;
+            }
             Mat cropped;
-            this->fourPointsTransform(frame, vertices, cropped);
-
-            cvtColor(cropped, cropped, cv::COLOR_BGR2GRAY);
-
-            Mat blobCrop = blobFromImage(cropped, 1.0 / 127.5, Size(), Scalar::all(127.5));
-            this->recognizer.setInput(blobCrop);
-
-            Mat result = this->recognizer.forward();
-
-            std::string wordRecognized = "";
-            this->decodeText(result, wordRecognized);
+            Rect roi = minAreaRect(vertices_arr).boundingRect();
+            Rect roi_expand;
+            expandRectangle(roi, 0.4, roi_expand);
+            //this->fourPointsTransform(frame, vertices, cropped);
+            cropped = frame((roi_expand & image_size));
+            string wordRecognized = recognizer->recognize(cropped);
             putText(frame, wordRecognized, vertices[1], FONT_HERSHEY_SIMPLEX, 1.5, Scalar(0, 0, 255));
+            rectangle(frame, roi_expand, Scalar(0, 0, 255), 2);
+            // cvtColor(cropped, cropped, cv::COLOR_BGR2GRAY);
+
+            // Mat blobCrop = blobFromImage(cropped, 1.0 / 127.5, Size(), Scalar::all(127.5));
+            // this->recognizer.setInput(blobCrop);
+
+            // Mat result = this->recognizer.forward();
+
+            // std::string wordRecognized = "";
+            // this->decodeText(result, wordRecognized);
+            // putText(frame, wordRecognized, vertices[1], FONT_HERSHEY_SIMPLEX, 1.5, Scalar(0, 0, 255));
         }
 
-        for (int j = 0; j < 4; ++j)
-            line(frame, vertices[j], vertices[(j + 1) % 4], Scalar(0, 255, 0), 1);
+        // for (int j = 0; j < 4; ++j)
+        //     line(frame, vertices[j], vertices[(j + 1) % 4], Scalar(0, 255, 0), 1);
     }
     // Put efficiency information.
 
