@@ -7,8 +7,8 @@ OCR::OCR(string modelRecognition, string alphabet)
 	this->inpHeight = 320;
 	this->inpWidth = 320;
     this->alphabet = alphabet;
-    String model = "/home/nuninu98/Downloads/frozen_east_text_detection.pb";
-	this->detector = readNet(model);
+    string model = "/home/nuninu98/Downloads/frozen_east_text_detection.pb";
+	this->detector = cv::dnn::readNet(model);
 	this->modelRecognition = modelRecognition;
 	detector.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
     detector.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
@@ -20,19 +20,17 @@ OCR::OCR(string modelRecognition, string alphabet)
         while(getline(vocFile, vocLine)){
             vocabulary.push_back(vocLine);
         }
-        recognizer.reset(new TextRecognitionModel(modelRecognition));
+        recognizer.reset(new cv::dnn::TextRecognitionModel(modelRecognition));
         recognizer->setVocabulary(vocabulary);
         recognizer->setDecodeType("CTC-greedy");
-        recognizer->setInputParams(1.0/127.5, Size(100, 32), Scalar(127.5));
+        recognizer->setInputParams(1.0/127.5, cv::Size(100, 32), cv::Scalar(127.5));
         recognizer->setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
         recognizer->setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
-		// this->recognizer = readNet(modelRecognition);
-        // recognizer.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-        // recognizer.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+
 	}	
 }
 
-void OCR::decodeBoundingBoxes(const Mat& scores, const Mat& geometry, std::vector<RotatedRect>& detections, std::vector<float>& confidences)
+void OCR::decodeBoundingBoxes(const cv::Mat& scores, const cv::Mat& geometry, vector<cv::RotatedRect>& detections, std::vector<float>& confidences)
 {
     detections.clear();
     CV_Assert(scores.dims == 4); CV_Assert(geometry.dims == 4); CV_Assert(scores.size[0] == 1);
@@ -64,40 +62,40 @@ void OCR::decodeBoundingBoxes(const Mat& scores, const Mat& geometry, std::vecto
             float h = x0_data[x] + x2_data[x];
             float w = x1_data[x] + x3_data[x];
 
-            Point2f offset(offsetX + cosA * x1_data[x] + sinA * x2_data[x],
+            cv::Point2f offset(offsetX + cosA * x1_data[x] + sinA * x2_data[x],
                 offsetY - sinA * x1_data[x] + cosA * x2_data[x]);
-            Point2f p1 = Point2f(-sinA * h, -cosA * h) + offset;
-            Point2f p3 = Point2f(-cosA * w, sinA * w) + offset;
-            RotatedRect r(0.5f * (p1 + p3), Size2f(w, h), -angle * 180.0f / (float)CV_PI);
+            cv::Point2f p1 = cv::Point2f(-sinA * h, -cosA * h) + offset;
+            cv::Point2f p3 = cv::Point2f(-cosA * w, sinA * w) + offset;
+            cv::RotatedRect r(0.5f * (p1 + p3), cv::Size2f(w, h), -angle * 180.0f / (float)CV_PI);
             detections.push_back(r);
             confidences.push_back(score);
         }
     }
 }
 
-void OCR::fourPointsTransform(const Mat& frame, Point2f vertices[4], Mat& result)
+void OCR::fourPointsTransform(const cv::Mat& frame, cv::Point2f vertices[4], cv::Mat& result)
 {
-    const Size outputSize = Size(100, 32);
+    const cv::Size outputSize = cv::Size(100, 32);
 
-    Point2f targetVertices[4] = { Point(0, outputSize.height - 1),
-                                  Point(0, 0), Point(outputSize.width - 1, 0),
-                                  Point(outputSize.width - 1, outputSize.height - 1),
+    cv::Point2f targetVertices[4] = { cv::Point(0, outputSize.height - 1),
+                                  cv::Point(0, 0), cv::Point(outputSize.width - 1, 0),
+                                  cv::Point(outputSize.width - 1, outputSize.height - 1),
                                 };
-    Mat rotationMatrix = getPerspectiveTransform(vertices, targetVertices);
+    cv::Mat rotationMatrix = getPerspectiveTransform(vertices, targetVertices);
 
     warpPerspective(frame, result, rotationMatrix, outputSize);
 }
 
-void OCR::decodeText(const Mat& scores, std::string& text)
+void OCR::decodeText(const cv::Mat& scores, string& text)
 {
-    Mat scoresMat = scores.reshape(1, scores.size[0]);
+    cv::Mat scoresMat = scores.reshape(1, scores.size[0]);
 
-    std::vector<char> elements;
+    vector<char> elements;
     elements.reserve(scores.size[0]);
 
     for (int rowIndex = 0; rowIndex < scoresMat.rows; ++rowIndex)
     {
-        Point p;
+        cv::Point p;
         minMaxLoc(scoresMat.row(rowIndex), 0, 0, 0, &p);
         if (p.x > 0 && static_cast<size_t>(p.x) <= this->alphabet.size())
         {
@@ -122,50 +120,50 @@ void OCR::decodeText(const Mat& scores, std::string& text)
     }
 }
 
-void OCR::expandRectangle(const Rect& input, double rate, Rect& output){
+void OCR::expandRectangle(const cv::Rect& input, double rate, cv::Rect& output){
     double w = input.width;
     double h = input.height;
-    Point center = input.tl() + Point(w/2, h/2);
+    cv::Point center = input.tl() + cv::Point(w/2, h/2);
     w *= (1.0 + rate);
     h *= (1.0 + rate);
-    Point topleft = center - Point(w/2 , h/2);
-    output = Rect(topleft.x, topleft.y, w, h);
+    cv::Point topleft = center - cv::Point(w/2 , h/2);
+    output = cv::Rect(topleft.x, topleft.y, w, h);
 }
 
 
-void OCR::detect_rec(Mat& frame)
+void OCR::detect_rec(cv::Mat& frame)
 {
-    Mat frame_copy = frame.clone();
-    std::vector<Mat> outs;
-    std::vector<String> outNames(2);
+    cv::Mat frame_copy = frame.clone();
+    vector<cv::Mat> outs;
+    vector<string> outNames(2);
     outNames[0] = "feature_fusion/Conv_7/Sigmoid";
     outNames[1] = "feature_fusion/concat_3";
-    Mat blob;
-    blobFromImage(frame, blob, 1.0, Size(this->inpWidth, this->inpHeight), Scalar(123.68, 116.78, 103.94), true, false);
+    cv::Mat blob;
+    cv::dnn::blobFromImage(frame, blob, 1.0, cv::Size(this->inpWidth, this->inpHeight), cv::Scalar(123.68, 116.78, 103.94), true, false);
     this->detector.setInput(blob);
     //this->detector.forward(outs, this->detector.getUnconnectedOutLayersNames());   ////ÔËÐÐ»á³ö´í
     this->detector.forward(outs, outNames);
 
-    Mat scores = outs[0];
-    Mat geometry = outs[1];
+    cv::Mat scores = outs[0];
+    cv::Mat geometry = outs[1];
     // Decode predicted bounding boxes.
-    std::vector<RotatedRect> boxes;
-    std::vector<float> confidences;
+    vector<cv::RotatedRect> boxes;
+    vector<float> confidences;
     this->decodeBoundingBoxes(scores, geometry, boxes, confidences);
 
     // Apply non-maximum suppression procedure.
     std::vector<int> indices;
-    NMSBoxes(boxes, confidences, this->confThreshold, this->nmsThreshold, indices);
+    cv::dnn::NMSBoxes(boxes, confidences, this->confThreshold, this->nmsThreshold, indices);
 
-    Point2f ratio((float)frame.cols / this->inpWidth, (float)frame.rows / this->inpHeight);
+    cv::Point2f ratio((float)frame.cols / this->inpWidth, (float)frame.rows / this->inpHeight);
     // Render text.
-    Rect image_size = Rect(0, 0, frame.cols, frame.rows);
+    cv::Rect image_size = cv::Rect(0, 0, frame.cols, frame.rows);
     #pragma omp parallel for
     for (size_t i = 0; i < indices.size(); ++i)
     {
-        RotatedRect& box = boxes[indices[i]];
+        cv::RotatedRect& box = boxes[indices[i]];
 
-        Point2f vertices[4];
+        cv::Point2f vertices[4];
         box.points(vertices);
 
         for (int j = 0; j < 4; ++j)
@@ -177,7 +175,7 @@ void OCR::detect_rec(Mat& frame)
         if (!this->modelRecognition.empty())
         {   
             bool valid = true;
-            vector<Point2f> vertices_arr(4);
+            vector<cv::Point2f> vertices_arr(4);
             for (int j = 0; j < 4; ++j)
             {
                 if(vertices[j].x < 0 || vertices[j].y < 0 || vertices[j].x >= frame.cols || vertices[j].y >= frame.rows){
@@ -189,32 +187,36 @@ void OCR::detect_rec(Mat& frame)
             if(!valid){
                 continue;
             }
-            Mat cropped;
-            Rect roi = minAreaRect(vertices_arr).boundingRect();
-            Rect roi_expand;
+            cv::Mat cropped;
+            cv::Rect roi = minAreaRect(vertices_arr).boundingRect();
+            cv::Rect roi_expand;
             expandRectangle(roi, 0.4, roi_expand);
             //this->fourPointsTransform(frame, vertices, cropped);
             #pragma omp critical
             {
                 cropped = frame((roi_expand & image_size));
                 //=============Test Heq============
-                Mat crop_hsv;
-                cvtColor(cropped, crop_hsv, COLOR_BGR2HSV);
-                vector<Mat> hsv_hist;
-                split(crop_hsv, hsv_hist);
-                equalizeHist(hsv_hist[2], hsv_hist[2]);
-                Mat hsv_eq;
-                merge(hsv_hist, hsv_eq);
-                Mat crop_v_eq;
-                cvtColor(hsv_eq, crop_v_eq, COLOR_HSV2BGR);
-                
-                //=================================
+                cv::Mat crop_hsv;
+                cv::cvtColor(cropped, crop_hsv, cv::COLOR_BGR2HSV);
+                vector<cv::Mat> hsv_hist;
+                cv::split(crop_hsv, hsv_hist);
+                cv::equalizeHist(hsv_hist[2], hsv_hist[2]);
+                cv::Mat hsv_eq;
+                cv::merge(hsv_hist, hsv_eq);
+                cv::Mat crop_v_eq;
+                cv::cvtColor(hsv_eq, crop_v_eq, cv::COLOR_HSV2BGR);
+                //============Thresh?===========
+                // cv::Mat eq_gray, eq_thresh;
+                // cv::cvtColor(crop_v_eq, eq_gray, cv::COLOR_BGR2GRAY);
+                // cv::threshold(eq_gray, eq_thresh, 200, 255, cv::ThresholdTypes::THRESH_BINARY);
+                // cv::cvtColor(eq_thresh, crop_v_eq, cv::COLOR_GRAY2BGR);
+                //==============================
                 string wordRecognized = recognizer->recognize(crop_v_eq);
                 if(all_of(wordRecognized.begin(), wordRecognized.end(), ::isdigit) && !wordRecognized.empty()){
-                    putText(frame_copy, wordRecognized, vertices[1], FONT_HERSHEY_SIMPLEX, 1.5, Scalar(0, 0, 255));
-                    rectangle(frame_copy, roi_expand, Scalar(0, 0, 255), 2);
-                    imshow("Equalized", crop_v_eq);
-                    waitKey(1);
+                    cv::putText(frame_copy, wordRecognized, vertices[1], cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 0, 255));
+                    cv::rectangle(frame_copy, roi_expand, cv::Scalar(0, 0, 255), 2);
+                    cv::imshow("Detected", crop_v_eq);
+                    cv::waitKey(1);
                 }
                 
             }
@@ -231,13 +233,13 @@ void OCR::detect_rec(Mat& frame)
             // putText(frame, wordRecognized, vertices[1], FONT_HERSHEY_SIMPLEX, 1.5, Scalar(0, 0, 255));
         }
 
-        // for (int j = 0; j < 4; ++j)
-        //     line(frame, vertices[j], vertices[(j + 1) % 4], Scalar(0, 255, 0), 1);
+        for (int j = 0; j < 4; ++j)
+            line(frame_copy, vertices[j], vertices[(j + 1) % 4], cv::Scalar(0, 255, 0), 1);
     }
 
     string kWinName = "Deep learning object detection in OpenCV";
-    namedWindow(kWinName, WINDOW_NORMAL);
-    imshow(kWinName, frame_copy);
-    waitKey(1);
+    cv::namedWindow(kWinName, cv::WINDOW_NORMAL);
+    cv::imshow(kWinName, frame_copy);
+    cv::waitKey(1);
 
 }

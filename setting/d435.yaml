@@ -8,10 +8,10 @@ File.version: "1.0"
 Camera.type: "PinHole"
 
 # Right Camera calibration and distortion parameters (OpenCV)
-Camera1.fx: 618.5508422851562
-Camera1.fy: 618.956298828125
-Camera1.cx: 332.2762756347656
-Camera1.cy: 239.38070678710938
+Camera1.fx: 644.961181640625
+Camera1.fy: 644.1006469726562
+Camera1.cx: 644.2869873046875
+Camera1.cy: 361.4469299316406
 
 
 # distortion parameters
@@ -44,7 +44,7 @@ RGBD.DepthMapFactor: 1000.0
 # ORB Parameters
 #--------------------------------------------------------------------------------------------
 # ORB Extractor: Number of features per image
-ORBextractor.nFeatures: 1250
+ORBextractor.nFeatures: 1000
 
 # ORB Extractor: Scale factor between levels in the scale pyramid 	
 ORBextractor.scaleFactor: 1.2
@@ -73,4 +73,4 @@ Viewer.ViewpointY: -0.7
 Viewer.ViewpointZ: -3.5
 Viewer.ViewpointF: 500.0
 
-loopClosing: 0
+loopClosing: 1

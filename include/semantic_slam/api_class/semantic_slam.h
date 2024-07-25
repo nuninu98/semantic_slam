@@ -42,6 +42,7 @@
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
 #include <semantic_slam/algorithm/landmark_detector.h>
+#include <semantic_slam/algorithm/ocr.h>
 using namespace std;
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
@@ -57,8 +58,14 @@ class SemanticSLAM{
         vector<cv::Scalar> colors_;
         LandmarkDetector ld_;
         vector<string> class_names_;
+
+        ros::Subscriber sub_detection_image_;
+
         void imageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image);
-    
+        
+        shared_ptr<OCR> ocr_;
+
+        void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image);
     public:
         SemanticSLAM();
 

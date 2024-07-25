@@ -24,7 +24,7 @@ int main(int argc, char** argv){
 
     // Load network.
     ocr = new OCR("/home/nuninu98/Downloads/crnn_cs.onnx", "/home/nuninu98/Downloads/alphabet_94.txt");
-    ros::Subscriber sub_image = nh.subscribe("/d455/color/image_raw", 1, imageCallback);
+    ros::Subscriber sub_image = nh.subscribe("/d435/color/image_raw", 1, imageCallback);
     ros::spin();
     // string folder = "/home/nuninu98/catkin_ws/src/data_collector/images/d435_front/";
     // string name = "1721617563_795256138";

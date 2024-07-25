@@ -154,8 +154,7 @@ int main(int argc, char** argv){
             else{
                 cout<<"DROPPED: "<<text_detected<<endl;
             }
-            cv::imshow(text_detected, box_img);
-            cv::waitKey(0);
+        
         }
         // Put efficiency information.
         //putText(frame, label, Point(0, 15), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 255, 0));

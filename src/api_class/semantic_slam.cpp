@@ -7,6 +7,14 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"){
     string setting_file;
     pnh_.param<string>("setting_file", setting_file, "/home/nuninu98/catkin_ws/src/orb_semantic_slam/setting/tum_rgbd.yaml");
 
+    string crnn_file;
+    pnh_.param<string>("crnn_file", crnn_file, "");
+
+    string text_list;
+    pnh_.param<string>("text_list", text_list, "");
+
+    ocr_.reset(new OCR(crnn_file, text_list));
+
     string color_file;
     pnh_.param<string>("color_file", color_file, "");
     ifstream ifs(color_file.c_str());
@@ -21,6 +29,8 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"){
     }
     class_names_ = ld_.getClassNames();
     visual_odom_ = new ORB_SLAM3::System(voc_file, setting_file ,ORB_SLAM3::System::RGBD, true);
+
+    sub_detection_image_ = nh_.subscribe("detection_camera", 1, &SemanticSLAM::detectionImageCallback, this);
 
     string rgb_topic, depth_topic;
     pnh_.param<string>("rgb_topic", rgb_topic, "/camera/color/image_raw");
@@ -38,18 +48,34 @@ void SemanticSLAM::imageCallback(const sensor_msgs::ImageConstPtr& rgb_image, co
     cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(rgb_image, "bgr8");
     cv_bridge::CvImageConstPtr cv_depth_bridge = cv_bridge::toCvShare(depth_image, depth_image->encoding);
    
-    //Eigen::Matrix4d cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec()).matrix().cast<double>();
+    Eigen::Matrix4d cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec()).matrix().cast<double>();
     vector<Detection> detections;
     //detections = ld_.detectObjectMRCNN(cv_rgb_bridge->image);
-    detections = ld_.detectObjectYOLO(cv_rgb_bridge->image);
+    //detections = ld_.detectObjectYOLO(cv_rgb_bridge->image);
     cv::Mat detection_img = cv_rgb_bridge->image.clone();
     for(const auto& m : detections){
         cv::rectangle(detection_img, m.getRoI(), colors_[m.getClassID() % 12], 2);
         cv::putText(detection_img, class_names_[m.getClassID()], m.getRoI().tl(), 1, 1, colors_[m.getClassID() % 12]);
     }
-    cv::imshow("detection", detection_img);
-    cv::waitKey(1);
+    //cv::imshow("detection", detection_img);
+    //cv::waitKey(1);
     // cout<<"DELAY: "<<(ros::Time::now() - tic).toSec()<<endl;
+}
+
+void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image){
+    cv_bridge::CvImageConstPtr bridge = cv_bridge::toCvShare(color_image, "bgr8");
+    cv::Mat image = bridge->image;
+    vector<Detection> detections = ld_.detectObjectYOLO(image);
+    //============TODO===============
+    /*
+    1. Door + Floor sign dataset
+    2. Yolo training
+    3. Door -> detect room number (clear)
+    4. Door -> Wall plane projection
+    5. Floor, Room info to ORB SLAM
+    6. Comparison
+    */
+    //===============================
 }
 
 SemanticSLAM::~SemanticSLAM(){

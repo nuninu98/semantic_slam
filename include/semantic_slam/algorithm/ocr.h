@@ -6,8 +6,7 @@
 #include <opencv2/highgui.hpp>
 #include <fstream>
 #include <omp.h>
-using namespace cv;
-using namespace dnn;
+#include <opencv2/ximgproc.hpp>
 using namespace std;
 
 class OCR
@@ -18,16 +17,16 @@ class OCR
 		int inpWidth;
 		int inpHeight;
 		string modelRecognition;
-		Net detector;
+		cv::dnn::Net detector;
 		string alphabet;
 		//=========Testing============
-		shared_ptr<TextRecognitionModel> recognizer;
+		shared_ptr<cv::dnn::TextRecognitionModel> recognizer;
 		vector<string> vocabulary;
 		//=============================
-		void decodeBoundingBoxes(const Mat& scores, const Mat& geometry, std::vector<RotatedRect>& detections, std::vector<float>& confidences);
-        void fourPointsTransform(const Mat& frame, Point2f vertices[4], Mat& result);
-        void decodeText(const Mat& scores, std::string& text);
-		void expandRectangle(const Rect& input, double rate, Rect& output);
+		void decodeBoundingBoxes(const cv::Mat& scores, const cv::Mat& geometry, vector<cv::RotatedRect>& detections, vector<float>& confidences);
+        void fourPointsTransform(const cv::Mat& frame, cv::Point2f vertices[4], cv::Mat& result);
+        void decodeText(const cv::Mat& scores, string& text);
+		void expandRectangle(const cv::Rect& input, double rate, cv::Rect& output);
 	public:
 		
 
@@ -35,7 +34,7 @@ class OCR
 		//Net recognizer;
         OCR(string modelRecognition, string alphabet);
 		
-        void detect_rec(Mat& frame);
+        void detect_rec(cv::Mat& frame);
 };
 
 #endif
