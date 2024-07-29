@@ -72,6 +72,9 @@ class SemanticSLAM{
         
         queue<sensor_msgs::Imu> imu_buf_;
 
+        mutex floor_lock_;
+        queue<pair<ros::Time, int>> floor_detection_buf_;
+
         void trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image);
         
         void imuCallback(const sensor_msgs::ImuConstPtr& imu);

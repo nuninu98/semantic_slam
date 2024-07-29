@@ -28,7 +28,7 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"){
         colors_.push_back(cv::Scalar(r, g, b, 255.0));
     }
     class_names_ = ld_.getClassNames();
-    visual_odom_ = new ORB_SLAM3::System(voc_file, setting_file ,ORB_SLAM3::System::RGBD, true);
+    visual_odom_ = new ORB_SLAM3::System(voc_file, setting_file ,ORB_SLAM3::System::RGBD, false);
 
     sub_detection_image_ = nh_.subscribe("/d435/color/image_raw", 1, &SemanticSLAM::detectionImageCallback, this);
 
@@ -63,7 +63,9 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
         imu_buf_.pop();
     }
     imu_lock_.unlock();
+    //ros::Time tic = ros::Time::now();
     Eigen::Matrix4d cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), imu_points).matrix().cast<double>();
+    //cout<<"dt: "<<(ros::Time::now() - tic).toSec()<<endl;
 }
 
 void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image){

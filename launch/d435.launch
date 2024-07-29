@@ -1,7 +1,7 @@
 <launch>
     <param name="use_sim_time" value="true"/>
     <arg name="setting_file" default="$(find semantic_slam)/setting/d435.yaml"/>
-    <node name="test_semantic_slam" pkg="semantic_slam" type="test_semantic_slam" output="screen">
+    <node name="test_semantic_slam" pkg="semantic_slam" type="test_semantic_slam" output="screen" launch-prefix="xterm -e gdb --args">
         <param name="vocabulary_file" value="$(find semantic_slam)/model/ORBvoc.txt"/>
         <param name="setting_file" value="$(arg setting_file)"/>
 

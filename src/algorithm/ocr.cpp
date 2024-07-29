@@ -209,8 +209,10 @@ vector<OCRDetection> OCR::detect_rec(cv::Mat& frame)
                 
                 string wordRecognized = recognizer->recognize(crop_v_eq);
                 if(all_of(wordRecognized.begin(), wordRecognized.end(), ::isdigit) && !wordRecognized.empty()){
-                    OCRDetection text(roi, stoi(wordRecognized));
-                    output.push_back(text);
+                    if(wordRecognized.size() == 4){
+                        OCRDetection text(roi, stoi(wordRecognized));
+                        output.push_back(text);
+                    }
                     // cv::putText(frame_copy, wordRecognized, vertices[1], cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 0, 255));
                     // cv::rectangle(frame_copy, roi_expand, cv::Scalar(0, 0, 255), 2);
                     // cv::imshow("Detected", crop_v_eq);
