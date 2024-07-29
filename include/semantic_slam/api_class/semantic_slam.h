@@ -43,6 +43,9 @@
 #include <cv_bridge/cv_bridge.h>
 #include <semantic_slam/algorithm/landmark_detector.h>
 #include <semantic_slam/algorithm/ocr.h>
+#include <sensor_msgs/Imu.h>
+#include <mutex>
+#include <queue>
 using namespace std;
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
@@ -61,9 +64,17 @@ class SemanticSLAM{
 
         ros::Subscriber sub_detection_image_;
 
+        ros::Subscriber sub_imu_;
+
+        shared_ptr<OCR> ocr_;
+
+        mutex imu_lock_;
+        
+        queue<sensor_msgs::Imu> imu_buf_;
+
         void imageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image);
         
-        shared_ptr<OCR> ocr_;
+        void imuCallback(const sensor_msgs::ImuConstPtr& imu);
 
         void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image);
     public:

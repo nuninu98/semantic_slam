@@ -6,10 +6,10 @@
 #include <opencv2/opencv.hpp>
 
 class Detection{
-    private:
+    protected:
         cv::Rect roi_;
         cv::Mat mask_;
-        size_t class_id_;
+        size_t id_;
     public: 
         Detection();
 
@@ -24,5 +24,12 @@ class Detection{
         size_t getClassID() const;
 };
 
+
+class OCRDetection: public Detection{
+    public:
+        OCRDetection();
+
+        OCRDetection(const cv::Rect& roi, const size_t& id);
+};
 
 #endif

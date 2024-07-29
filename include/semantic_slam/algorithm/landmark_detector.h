@@ -13,6 +13,7 @@
 #include <Eigen/SVD>
 #include <fstream>
 #include <semantic_slam/data_types/data_types.h>
+#include <opencv2/cudaimgproc.hpp>
 using namespace std;
 
 const double CONFIDENCE_THRESHOLD = 0.5;
@@ -31,11 +32,9 @@ class LandmarkDetector{
         LandmarkDetector();
 
         ~LandmarkDetector();
-
-        //vector<SemanticMeasurement> detectObject(const cv::Mat& rgb_image);
-        vector<Detection> detectObjectMRCNN(const cv::Mat& rgb_image);
         
         vector<Detection> detectObjectYOLO(const cv::Mat& rgb_image);
+
 
         vector<string> getClassNames() const;
 };

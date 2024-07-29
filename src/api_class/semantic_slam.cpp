@@ -1,6 +1,6 @@
 #include <semantic_slam/api_class/semantic_slam.h>
-
 SemanticSLAM::SemanticSLAM(): pnh_("~"){
+
     string voc_file;
     pnh_.param<string>("vocabulary_file", voc_file, "/home/nuninu98/catkin_ws/src/orb_semantic_slam/model/ORBvoc.txt");
 
@@ -9,7 +9,7 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"){
 
     string crnn_file;
     pnh_.param<string>("crnn_file", crnn_file, "");
-
+    
     string text_list;
     pnh_.param<string>("text_list", text_list, "");
 
@@ -30,11 +30,12 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"){
     class_names_ = ld_.getClassNames();
     visual_odom_ = new ORB_SLAM3::System(voc_file, setting_file ,ORB_SLAM3::System::RGBD, true);
 
-    sub_detection_image_ = nh_.subscribe("detection_camera", 1, &SemanticSLAM::detectionImageCallback, this);
+    sub_detection_image_ = nh_.subscribe("/d435/color/image_raw", 1, &SemanticSLAM::detectionImageCallback, this);
 
-    string rgb_topic, depth_topic;
+    string rgb_topic, depth_topic, imu_topic;
     pnh_.param<string>("rgb_topic", rgb_topic, "/camera/color/image_raw");
     pnh_.param<string>("depth_topic", depth_topic, "/camera/aligned_depth_to_color/image_raw");
+    pnh_.param<string>("imu_topic", imu_topic, "/imu/data");
     rgb_subscriber_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, rgb_topic, 1));
     depth_subscriber_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, depth_topic, 1));
     
@@ -47,35 +48,51 @@ void SemanticSLAM::imageCallback(const sensor_msgs::ImageConstPtr& rgb_image, co
     ros::Time stamp = rgb_image->header.stamp;
     cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(rgb_image, "bgr8");
     cv_bridge::CvImageConstPtr cv_depth_bridge = cv_bridge::toCvShare(depth_image, depth_image->encoding);
-   
-    Eigen::Matrix4d cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec()).matrix().cast<double>();
-    vector<Detection> detections;
-    //detections = ld_.detectObjectMRCNN(cv_rgb_bridge->image);
-    //detections = ld_.detectObjectYOLO(cv_rgb_bridge->image);
-    cv::Mat detection_img = cv_rgb_bridge->image.clone();
-    for(const auto& m : detections){
-        cv::rectangle(detection_img, m.getRoI(), colors_[m.getClassID() % 12], 2);
-        cv::putText(detection_img, class_names_[m.getClassID()], m.getRoI().tl(), 1, 1, colors_[m.getClassID() % 12]);
+    vector<ORB_SLAM3::IMU::Point> imu_points;
+    imu_lock_.lock();
+    while(!imu_buf_.empty()){
+        sensor_msgs::Imu data = imu_buf_.front();
+        double stamp = data.header.stamp.toSec();
+        if(stamp > rgb_image->header.stamp.toSec()){
+            break;
+        }
+        cv::Point3f accel(data.linear_acceleration.x, data.linear_acceleration.y, data.linear_acceleration.z);
+        cv::Point3f gyro(data.angular_velocity.x, data.angular_velocity.y, data.angular_velocity.z);
+        ORB_SLAM3::IMU::Point p(accel, gyro, stamp);
+        imu_points.push_back(p);
+        imu_buf_.pop();
     }
-    //cv::imshow("detection", detection_img);
-    //cv::waitKey(1);
-    // cout<<"DELAY: "<<(ros::Time::now() - tic).toSec()<<endl;
+    imu_lock_.unlock();
+    Eigen::Matrix4d cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), imu_points).matrix().cast<double>();
 }
 
 void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image){
     cv_bridge::CvImageConstPtr bridge = cv_bridge::toCvShare(color_image, "bgr8");
     cv::Mat image = bridge->image;
     vector<Detection> detections = ld_.detectObjectYOLO(image);
+    ocr_->detect_rec(image);
+    for(const auto& m : detections){
+        cv::rectangle(image, m.getRoI(), colors_[m.getClassID() % 12], 2);
+        cv::putText(image, class_names_[m.getClassID()], m.getRoI().tl(), 1, 1, colors_[m.getClassID() % 12]);
+    }
+    cv::imshow("detection", image);
+    cv::waitKey(1);
     //============TODO===============
     /*
-    1. Door + Floor sign dataset
+    1. Door + Floor sign dataset (clear)
     2. Yolo training
     3. Door -> detect room number (clear)
-    4. Door -> Wall plane projection
+    4. Door -> Wall plane projection (dropped)
     5. Floor, Room info to ORB SLAM
-    6. Comparison
+    6. Comparison 
     */
     //===============================
+}
+
+void SemanticSLAM::imuCallback(const sensor_msgs::ImuConstPtr& imu){
+    imu_lock_.lock();
+    imu_buf_.push(*imu);
+    imu_lock_.unlock();
 }
 
 SemanticSLAM::~SemanticSLAM(){

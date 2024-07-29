@@ -32,6 +32,7 @@ Camera.fps: 30
 
 # Color order of the images (0: BGR, 1: RGB. It is ignored if images are grayscale)
 Camera.RGB: 0
+Camera.imageScale: 0.5 
 
 # Close/Far threshold. Baseline times.
 Stereo.ThDepth: 40.0
@@ -39,6 +40,25 @@ Stereo.b: 0.0745
 
 # Depth map values factor
 RGBD.DepthMapFactor: 1000.0
+
+IMU.T_b_c1:
+   rows: 4
+   cols: 4
+   dt: f
+   data: [1.0, 0.0, 0.0, 0.0,
+         0.0, 1.0, 0.0, 0.0,
+         0.0, 0.0, 1.0, 0.0,
+         0.0, 0.0, 0.0, 1.0]
+
+# Do not insert KFs when recently lost
+InsertKFsWhenLost: 0
+
+# IMU noise (Use those from VINS-mono)
+IMU.NoiseGyro: 1e-2 # 3 # 2.44e-4 #1e-3 # rad/s^0.5
+IMU.NoiseAcc: 1e-1 #2 # 1.47e-3 #1e-2 # m/s^1.5
+IMU.GyroWalk: 1e-6 # rad/s^1.5
+IMU.AccWalk: 1e-4 # m/s^2.5
+IMU.Frequency: 200.0
 
 #--------------------------------------------------------------------------------------------
 # ORB Parameters

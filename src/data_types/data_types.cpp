@@ -4,7 +4,7 @@ Detection::Detection(){
 
 }
 
-Detection::Detection(const cv::Rect& roi, const cv::Mat& mask, const size_t& id): roi_(roi), mask_(mask), class_id_(id){
+Detection::Detection(const cv::Rect& roi, const cv::Mat& mask, const size_t& id): roi_(roi), mask_(mask), id_(id){
 
 }
 
@@ -21,5 +21,14 @@ cv::Mat Detection::getMask() const{
 }
 
 size_t Detection::getClassID() const{
-    return class_id_;
+    return id_;
+}
+
+OCRDetection::OCRDetection(){
+    
+}
+
+OCRDetection::OCRDetection(const cv::Rect& roi, const size_t& id){
+    roi_ = roi;
+    id_ = id;
 }
