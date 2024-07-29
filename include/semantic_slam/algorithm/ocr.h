@@ -35,7 +35,7 @@ class OCR
 		//Net recognizer;
         OCR(string modelRecognition, string alphabet);
 		
-        void detect_rec(cv::Mat& frame);
+        vector<OCRDetection> detect_rec(cv::Mat& frame);
 };
 
 #endif

@@ -40,10 +40,10 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"){
     depth_subscriber_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, depth_topic, 1));
     
     sync_.reset(new message_filters::Synchronizer<sync_pol> (sync_pol(1000), *rgb_subscriber_, *depth_subscriber_));
-    sync_->registerCallback(boost::bind(&SemanticSLAM::imageCallback, this, _1, _2));
+    sync_->registerCallback(boost::bind(&SemanticSLAM::trackingImageCallback, this, _1, _2));
 }
 
-void SemanticSLAM::imageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image){
+void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image){
     //ros::Time tic = ros::Time::now();
     ros::Time stamp = rgb_image->header.stamp;
     cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(rgb_image, "bgr8");
@@ -70,10 +70,31 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
     cv_bridge::CvImageConstPtr bridge = cv_bridge::toCvShare(color_image, "bgr8");
     cv::Mat image = bridge->image;
     vector<Detection> detections = ld_.detectObjectYOLO(image);
-    ocr_->detect_rec(image);
+    vector<OCRDetection> text_detections = ocr_->detect_rec(image);
+    
     for(const auto& m : detections){
-        cv::rectangle(image, m.getRoI(), colors_[m.getClassID() % 12], 2);
-        cv::putText(image, class_names_[m.getClassID()], m.getRoI().tl(), 1, 1, colors_[m.getClassID() % 12]);
+        //==========Testing Room Number=========
+        if(class_names_[m.getClassID()] == "room_number"){
+            cv::Rect r1 = m.getRoI();
+            double max_iou = 0.2;
+            int max_iou_idx = -1;
+            for(int i = 0; i < text_detections.size(); ++i){
+                cv::Rect r2 = text_detections[i].getRoI();
+                cv::Rect common = (r1 & r2);
+                double iou = (double)common.area() / (double)(r1.area() + r2.area() - common.area());
+                if(iou > max_iou){
+                    max_iou = iou;
+                    max_iou_idx = i;
+                }
+            }
+            if(max_iou_idx == -1){
+                continue;
+            }
+            cv::rectangle(image, m.getRoI(), colors_[m.getClassID() % 12], 2);
+            cv::putText(image, to_string(text_detections[max_iou_idx].getClassID()), m.getRoI().tl(), 1, 1, colors_[m.getClassID() % 12]);
+        }
+        //======================================
+        
     }
     cv::imshow("detection", image);
     cv::waitKey(1);

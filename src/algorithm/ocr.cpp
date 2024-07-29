@@ -131,9 +131,10 @@ void OCR::expandRectangle(const cv::Rect& input, double rate, cv::Rect& output){
 }
 
 
-void OCR::detect_rec(cv::Mat& frame)
+vector<OCRDetection> OCR::detect_rec(cv::Mat& frame)
 {
-    cv::Mat frame_copy = frame.clone();
+    vector<OCRDetection> output;
+
     vector<cv::Mat> outs;
     vector<string> outNames(2);
     outNames[0] = "feature_fusion/Conv_7/Sigmoid";
@@ -158,6 +159,7 @@ void OCR::detect_rec(cv::Mat& frame)
     cv::Point2f ratio((float)frame.cols / this->inpWidth, (float)frame.rows / this->inpHeight);
     // Render text.
     cv::Rect image_size = cv::Rect(0, 0, frame.cols, frame.rows);
+    cv::Mat frame_copy = frame.clone();
     #pragma omp parallel for
     for (size_t i = 0; i < indices.size(); ++i)
     {
@@ -195,7 +197,6 @@ void OCR::detect_rec(cv::Mat& frame)
             #pragma omp critical
             {
                 cropped = frame((roi_expand & image_size));
-                //=============Test Heq============
                 cv::Mat crop_hsv;
                 cv::cvtColor(cropped, crop_hsv, cv::COLOR_BGR2HSV);
                 vector<cv::Mat> hsv_hist;
@@ -205,41 +206,30 @@ void OCR::detect_rec(cv::Mat& frame)
                 cv::merge(hsv_hist, hsv_eq);
                 cv::Mat crop_v_eq;
                 cv::cvtColor(hsv_eq, crop_v_eq, cv::COLOR_HSV2BGR);
-                //============Thresh?===========
-                // cv::Mat eq_gray, eq_thresh;
-                // cv::cvtColor(crop_v_eq, eq_gray, cv::COLOR_BGR2GRAY);
-                // cv::threshold(eq_gray, eq_thresh, 200, 255, cv::ThresholdTypes::THRESH_BINARY);
-                // cv::cvtColor(eq_thresh, crop_v_eq, cv::COLOR_GRAY2BGR);
-                //==============================
+                
                 string wordRecognized = recognizer->recognize(crop_v_eq);
                 if(all_of(wordRecognized.begin(), wordRecognized.end(), ::isdigit) && !wordRecognized.empty()){
-                    cv::putText(frame_copy, wordRecognized, vertices[1], cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 0, 255));
-                    cv::rectangle(frame_copy, roi_expand, cv::Scalar(0, 0, 255), 2);
-                    cv::imshow("Detected", crop_v_eq);
-                    cv::waitKey(1);
+                    OCRDetection text(roi, stoi(wordRecognized));
+                    output.push_back(text);
+                    // cv::putText(frame_copy, wordRecognized, vertices[1], cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 0, 255));
+                    // cv::rectangle(frame_copy, roi_expand, cv::Scalar(0, 0, 255), 2);
+                    // cv::imshow("Detected", crop_v_eq);
+                    // cv::waitKey(1);
                 }
                 
             }
             
-            // cvtColor(cropped, cropped, cv::COLOR_BGR2GRAY);
-
-            // Mat blobCrop = blobFromImage(cropped, 1.0 / 127.5, Size(), Scalar::all(127.5));
-            // this->recognizer.setInput(blobCrop);
-
-            // Mat result = this->recognizer.forward();
-
-            // std::string wordRecognized = "";
-            // this->decodeText(result, wordRecognized);
-            // putText(frame, wordRecognized, vertices[1], FONT_HERSHEY_SIMPLEX, 1.5, Scalar(0, 0, 255));
         }
 
-        for (int j = 0; j < 4; ++j)
-            line(frame_copy, vertices[j], vertices[(j + 1) % 4], cv::Scalar(0, 255, 0), 1);
+        // for (int j = 0; j < 4; ++j)
+        //     line(frame_copy, vertices[j], vertices[(j + 1) % 4], cv::Scalar(0, 255, 0), 1);
     }
+    
 
-    string kWinName = "Deep learning object detection in OpenCV";
-    cv::namedWindow(kWinName, cv::WINDOW_NORMAL);
-    cv::imshow(kWinName, frame_copy);
-    cv::waitKey(1);
+    // string kWinName = "Deep learning object detection in OpenCV";
+    // cv::namedWindow(kWinName, cv::WINDOW_NORMAL);
+    // cv::imshow(kWinName, frame_copy);
+    // cv::waitKey(1);
 
+    return output;
 }
