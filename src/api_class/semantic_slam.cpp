@@ -52,19 +52,36 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
     imu_lock_.lock();
     while(!imu_buf_.empty()){
         sensor_msgs::Imu data = imu_buf_.front();
-        double stamp = data.header.stamp.toSec();
-        if(stamp > rgb_image->header.stamp.toSec()){
+        double imu_stamp = data.header.stamp.toSec();
+        if(imu_stamp > rgb_image->header.stamp.toSec()){
             break;
         }
         cv::Point3f accel(data.linear_acceleration.x, data.linear_acceleration.y, data.linear_acceleration.z);
         cv::Point3f gyro(data.angular_velocity.x, data.angular_velocity.y, data.angular_velocity.z);
-        ORB_SLAM3::IMU::Point p(accel, gyro, stamp);
+        ORB_SLAM3::IMU::Point p(accel, gyro, imu_stamp);
         imu_points.push_back(p);
         imu_buf_.pop();
     }
     imu_lock_.unlock();
-    //ros::Time tic = ros::Time::now();
-    Eigen::Matrix4d cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), imu_points).matrix().cast<double>();
+
+    vector<Object> objects;
+    object_lock_.lock();
+    while(!obj_detection_buf_.empty()){
+        double obj_stamp = obj_detection_buf_.front().first.toSec();
+        if(obj_stamp > stamp.toSec()){
+            break;
+        }
+        if(stamp.toSec() - obj_stamp < 0.1){
+            for(const auto& elem : obj_detection_buf_.front().second){
+                objects.push_back(elem);
+            }
+        }
+        obj_detection_buf_.pop();
+    }
+    object_lock_.unlock();
+    
+    Eigen::Matrix4d cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), objects, imu_points).matrix().cast<double>();
+    //Eigen::Matrix4d cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), imu_points).matrix().cast<double>();
     //cout<<"dt: "<<(ros::Time::now() - tic).toSec()<<endl;
 }
 
@@ -73,10 +90,10 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
     cv::Mat image = bridge->image;
     vector<Detection> detections = ld_.detectObjectYOLO(image);
     vector<OCRDetection> text_detections = ocr_->detect_rec(image);
-    
+    vector<Object> doors;
     for(const auto& m : detections){
         //==========Testing Room Number=========
-        if(class_names_[m.getClassID()] == "room_number"){
+        if(m.getClassName() == "room_number"){
             cv::Rect r1 = m.getRoI();
             double max_iou = 0.2;
             int max_iou_idx = -1;
@@ -92,22 +109,31 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
             if(max_iou_idx == -1){
                 continue;
             }
-            cv::rectangle(image, m.getRoI(), colors_[m.getClassID() % 12], 2);
-            cv::putText(image, to_string(text_detections[max_iou_idx].getClassID()), m.getRoI().tl(), 1, 1, colors_[m.getClassID() % 12]);
+
+            doors.push_back(Object(m.getClassName(), stoi(text_detections[max_iou_idx].getClassName())));
+            
+            cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
+            cv::putText(image, text_detections[max_iou_idx].getClassName(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
         }
-        //======================================
-        
+        //====================================== 
+    }
+
+    if(!doors.empty()){
+        object_lock_.lock();
+        obj_detection_buf_.push(make_pair(color_image->header.stamp, doors));
+        object_lock_.unlock();
     }
     cv::imshow("detection", image);
     cv::waitKey(1);
     //============TODO===============
     /*
     1. Door + Floor sign dataset (clear)
-    2. Yolo training
+    2. Yolo training (clear)
     3. Door -> detect room number (clear)
     4. Door -> Wall plane projection (dropped)
     5. Floor, Room info to ORB SLAM
-    6. Comparison 
+    6. Semantic Object as child node of graph node (Jinwhan's feedback. Generalizing for rooms with no number)
+    7. Comparison 
     */
     //===============================
 }

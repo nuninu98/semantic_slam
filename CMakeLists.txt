@@ -15,7 +15,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Ofast -DNDEBUG -Wno-deprecated-de
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
 
 set(ORB_SLAM3_DIR
-   $ENV{HOME}/ORB_SLAM3
+   $ENV{HOME}/ORB_SLAM3_semantic
 )
 
 find_package(catkin REQUIRED COMPONENTS
@@ -161,13 +161,13 @@ include_directories(
   ${GTSAM_INCLUDE_DIR}
 )
 
-add_library(semantic_slam_dtype
-  src/data_types/data_types.cpp
-)
-target_link_libraries(semantic_slam_dtype
-  ${OpenCV_LIBS} 
-  ${EIGEN3_LIBS}
-)
+# add_library(semantic_slam_dtype
+#   src/data_types/data_types.cpp
+# )
+# target_link_libraries(semantic_slam_dtype
+#   ${OpenCV_LIBS} 
+#   ${EIGEN3_LIBS}
+# )
 
 add_library(semantic_slam_algorithm
   src/algorithm/landmark_detector.cpp
@@ -175,7 +175,8 @@ add_library(semantic_slam_algorithm
 )
 target_link_libraries(semantic_slam_algorithm
   ${catkin_LIBRARIES}
-  semantic_slam_dtype
+  ${ORB_SLAM3_DIR}/lib/libORB_SLAM3.so
+  #semantic_slam_dtype
   gtsam
 )
 
@@ -191,7 +192,7 @@ target_link_libraries(semantic_slam_api
   gtsam
   semantic_slam_algorithm
   ${EIGEN3_LIBS}
-  ${ORB_SLAM3_DIR}/lib/libORB_SLAM3.so
+  
 )
 
 ## Add cmake target dependencies of the library

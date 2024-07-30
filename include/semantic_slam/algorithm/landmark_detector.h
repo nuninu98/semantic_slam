@@ -12,7 +12,7 @@
 #include <Eigen/Dense>
 #include <Eigen/SVD>
 #include <fstream>
-#include <semantic_slam/data_types/data_types.h>
+#include "DataType.h"
 #include <opencv2/cudaimgproc.hpp>
 using namespace std;
 

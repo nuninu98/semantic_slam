@@ -7,7 +7,7 @@
 #include <fstream>
 #include <omp.h>
 #include <opencv2/ximgproc.hpp>
-#include <semantic_slam/data_types/data_types.h>
+#include "DataType.h"
 using namespace std;
 
 class OCR

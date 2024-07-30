@@ -1,7 +1,8 @@
 #ifndef __SEMANTIC_SLAM_HEADER_H__
 #define __SEMANTIC_SLAM_HEADER_H__
 #include <ros/ros.h>
-#include <include/System.h>
+//#include <include/System.h>
+#include "System.h"
 #include <Eigen/Core>
 #include <Eigen/Dense>
 //#include <orb_semantic_slam/algorithm/gtsam_quadrics/geometry/ConstrainedDualQuadric.h>
@@ -72,8 +73,8 @@ class SemanticSLAM{
         
         queue<sensor_msgs::Imu> imu_buf_;
 
-        mutex floor_lock_;
-        queue<pair<ros::Time, int>> floor_detection_buf_;
+        mutex object_lock_;
+        queue<pair<ros::Time, vector<Object>>> obj_detection_buf_;
 
         void trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image);
         

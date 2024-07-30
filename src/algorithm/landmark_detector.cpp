@@ -95,7 +95,7 @@ vector<Detection> LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image){
     cv::dnn::NMSBoxes(boxes, confidences, CONFIDENCE_THRESHOLD, NMS_TRESHOLD, nms_result);
     for(int i = 0; i < nms_result.size(); ++i){
         int idx = nms_result[i];
-        Detection detection(boxes[idx], cv::Mat(), class_ids[idx]);
+        Detection detection(boxes[idx], cv::Mat(), class_names_[class_ids[idx]]);
         objects.push_back(detection);
     }
   
