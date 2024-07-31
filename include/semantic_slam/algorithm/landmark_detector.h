@@ -23,8 +23,8 @@ class LandmarkDetector{
         vector<string> class_names_;
         ros::NodeHandle pnh_;
         mutex lock_camera_;
-        cv::dnn::Net network_;
-        vector<string> last_layer_names_;
+        cv::dnn::Net signage_network_;
+        //vector<string> last_layer_names_;
         
         cv::Mat formatToSquare(const cv::Mat& source);
     

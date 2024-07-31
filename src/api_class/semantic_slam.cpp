@@ -28,7 +28,7 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"){
         colors_.push_back(cv::Scalar(r, g, b, 255.0));
     }
     class_names_ = ld_.getClassNames();
-    visual_odom_ = new ORB_SLAM3::System(voc_file, setting_file ,ORB_SLAM3::System::RGBD, false);
+    visual_odom_ = new ORB_SLAM3::System(voc_file, setting_file ,ORB_SLAM3::System::RGBD, true);
 
     sub_detection_image_ = nh_.subscribe("/d435/color/image_raw", 1, &SemanticSLAM::detectionImageCallback, this);
 
@@ -64,7 +64,7 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
     }
     imu_lock_.unlock();
 
-    vector<Object> objects;
+    vector<Detection> detections;
     object_lock_.lock();
     while(!obj_detection_buf_.empty()){
         double obj_stamp = obj_detection_buf_.front().first.toSec();
@@ -73,14 +73,14 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
         }
         if(stamp.toSec() - obj_stamp < 0.1){
             for(const auto& elem : obj_detection_buf_.front().second){
-                objects.push_back(elem);
+                detections.push_back(elem);
             }
         }
         obj_detection_buf_.pop();
     }
     object_lock_.unlock();
     
-    Eigen::Matrix4d cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), objects, imu_points).matrix().cast<double>();
+    Eigen::Matrix4d cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), detections, imu_points).matrix().cast<double>();
     //Eigen::Matrix4d cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), imu_points).matrix().cast<double>();
     //cout<<"dt: "<<(ros::Time::now() - tic).toSec()<<endl;
 }
@@ -90,8 +90,8 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
     cv::Mat image = bridge->image;
     vector<Detection> detections = ld_.detectObjectYOLO(image);
     vector<OCRDetection> text_detections = ocr_->detect_rec(image);
-    vector<Object> doors;
-    for(const auto& m : detections){
+    vector<Detection> doors;
+    for(auto& m : detections){
         //==========Testing Room Number=========
         if(m.getClassName() == "room_number"){
             cv::Rect r1 = m.getRoI();
@@ -109,11 +109,11 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
             if(max_iou_idx == -1){
                 continue;
             }
-
-            doors.push_back(Object(m.getClassName(), stoi(text_detections[max_iou_idx].getClassName())));
+            m.copyContent(text_detections[max_iou_idx]);
+            doors.push_back(m);
             
             cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
-            cv::putText(image, text_detections[max_iou_idx].getClassName(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
+            cv::putText(image, text_detections[max_iou_idx].getContent(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
         }
         //====================================== 
     }

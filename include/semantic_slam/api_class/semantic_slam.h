@@ -74,7 +74,7 @@ class SemanticSLAM{
         queue<sensor_msgs::Imu> imu_buf_;
 
         mutex object_lock_;
-        queue<pair<ros::Time, vector<Object>>> obj_detection_buf_;
+        queue<pair<ros::Time, vector<Detection>>> obj_detection_buf_;
 
         void trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image);
         

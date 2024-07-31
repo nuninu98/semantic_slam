@@ -6,12 +6,12 @@ LandmarkDetector::LandmarkDetector(): pnh_("~"){
     //============YOLOv8===============
     string yolo_model;
     pnh_.param<string>("yolo_model", yolo_model, "");
-    network_ = cv::dnn::readNetFromONNX(yolo_model);
-    last_layer_names_ = network_.getUnconnectedOutLayersNames();
+    signage_network_ = cv::dnn::readNetFromONNX(yolo_model);
+    //last_layer_names_ = signage_network_.getUnconnectedOutLayersNames();
     //=================================
 
-    network_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-    network_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+    signage_network_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+    signage_network_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
 
 }
 
@@ -37,11 +37,11 @@ vector<Detection> LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image){
     
     // cv::Size model_shape = rgb_image.size();
     // cv::Mat blob = cv::dnn::blobFromImage(model_input, 1.0 /255.0, model_shape, cv::Scalar(), true, false);
-    network_.setInput(blob);
+    signage_network_.setInput(blob);
     //========================Simple detection=======================
     vector<cv::Mat> outputs;
     ros::Time tic = ros::Time::now();
-    network_.forward(outputs, last_layer_names_);
+    signage_network_.forward(outputs, signage_network_.getUnconnectedOutLayersNames());
     int rows = outputs[0].size[1];
     int dimensions = outputs[0].size[2];
     bool yolov8 = false;
