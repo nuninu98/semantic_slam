@@ -5,22 +5,7 @@
 #include "System.h"
 #include <Eigen/Core>
 #include <Eigen/Dense>
-//#include <orb_semantic_slam/algorithm/gtsam_quadrics/geometry/ConstrainedDualQuadric.h>
-// #include <orb_semantic_slam/algorithm/gtsam_quadrics/geometry/BoundingBoxFactor.h>
-// #include <orb_semantic_slam/algorithm/gtsam_quadrics/geometry/QuadricCamera.h>
 #include <unordered_set>
-// #include <gtsam/geometry/Rot3.h>
-// #include <gtsam/geometry/Point3.h>
-// #include <gtsam/geometry/Pose3.h>
-// #include <gtsam/slam/PriorFactor.h>
-// #include <gtsam/slam/BetweenFactor.h>
-// #include <gtsam/nonlinear/NonlinearFactorGraph.h>
-// #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
-// #include <gtsam/nonlinear/Values.h>
-// #include <gtsam/nonlinear/ISAM2.h>
-// #include <gtsam/nonlinear/Marginals.h>
-// #include <gtsam/geometry/PinholeCamera.h>
-// #include <gtsam/inference/Symbol.h>
 #include <pcl/common/common.h>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
@@ -47,6 +32,10 @@
 #include <sensor_msgs/Imu.h>
 #include <mutex>
 #include <queue>
+#include <thread>
+#include <condition_variable>
+#include <tf2_ros/transform_broadcaster.h>
+#include <nav_msgs/Path.h>
 using namespace std;
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
@@ -81,6 +70,21 @@ class SemanticSLAM{
         void imuCallback(const sensor_msgs::ImuConstPtr& imu);
 
         void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image);
+    
+        Eigen::Matrix4f optic_in_base_;
+        //============Visualization===========
+        bool kill_flag_;
+        bool thread_killed_;
+        
+        thread keyframe_thread_;
+        mutex keyframe_lock_;
+        void keyframeCallback();
+        bool keyframe_updated_;
+        condition_variable keyframe_cv_;
+
+        tf2_ros::TransformBroadcaster broadcaster_;
+        ros::Publisher pub_path_;
+        //====================================
     public:
         SemanticSLAM();
 

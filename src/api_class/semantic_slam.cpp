@@ -1,5 +1,5 @@
 #include <semantic_slam/api_class/semantic_slam.h>
-SemanticSLAM::SemanticSLAM(): pnh_("~"){
+SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false), keyframe_updated_(false){
 
     string voc_file;
     pnh_.param<string>("vocabulary_file", voc_file, "/home/nuninu98/catkin_ws/src/orb_semantic_slam/model/ORBvoc.txt");
@@ -15,6 +15,16 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"){
 
     ocr_.reset(new OCR(crnn_file, text_list));
 
+    optic_in_base_ = Eigen::Matrix4f::Identity();
+    optic_in_base_(0, 0) = 0.0;
+    optic_in_base_(0, 2) = 1.0;
+    optic_in_base_(1, 0) = -1.0;
+    optic_in_base_(1, 1) = 0.0;
+    optic_in_base_(2, 1) = -1.0;
+    optic_in_base_(2, 2) = 0.0;
+
+    pub_path_ = nh_.advertise<nav_msgs::Path>("slam_path", 1);
+
     string color_file;
     pnh_.param<string>("color_file", color_file, "");
     ifstream ifs(color_file.c_str());
@@ -28,8 +38,11 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"){
         colors_.push_back(cv::Scalar(r, g, b, 255.0));
     }
     class_names_ = ld_.getClassNames();
-    visual_odom_ = new ORB_SLAM3::System(voc_file, setting_file ,ORB_SLAM3::System::RGBD, true);
-
+    visual_odom_ = new ORB_SLAM3::System(voc_file, setting_file ,ORB_SLAM3::System::RGBD, false);
+    visual_odom_->registerKeyframeCall(&keyframe_updated_, &keyframe_cv_);
+    keyframe_thread_ = thread(&SemanticSLAM::keyframeCallback, this);
+    keyframe_thread_.detach();
+    
     sub_detection_image_ = nh_.subscribe("/d435/color/image_raw", 1, &SemanticSLAM::detectionImageCallback, this);
 
     string rgb_topic, depth_topic, imu_topic;
@@ -80,7 +93,44 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
     }
     object_lock_.unlock();
     
-    Eigen::Matrix4d cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), detections, imu_points).matrix().cast<double>();
+    keyframe_lock_.lock();
+    ros::Time tic = ros::Time::now();
+    Eigen::Matrix4f cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), detections, imu_points).matrix();
+    cout<<(ros::Time::now() - tic).toSec()*1000.0<<"ms"<<endl;
+    keyframe_lock_.unlock();
+    Eigen::Matrix4f optic_in_map = cam_extrinsic.inverse();
+    Eigen::Matrix4f base_in_map = optic_in_map * optic_in_base_.inverse();
+
+    vector<geometry_msgs::TransformStamped> tfs;
+    geometry_msgs::TransformStamped tf;
+    tf.header.frame_id = "map_optic";
+    tf.header.stamp = rgb_image->header.stamp;
+    tf.child_frame_id = "base_link";
+    tf.transform.translation.x = base_in_map(0, 3);
+    tf.transform.translation.y = base_in_map(1, 3);
+    tf.transform.translation.z = base_in_map(2, 3);
+    Eigen::Quaternionf q_tf(base_in_map.block<3, 3>(0, 0));
+    tf.transform.rotation.w = q_tf.w();
+    tf.transform.rotation.x = q_tf.x();
+    tf.transform.rotation.y = q_tf.y();
+    tf.transform.rotation.z = q_tf.z();
+    tfs.push_back(tf);
+
+    geometry_msgs::TransformStamped tf_offset;
+    tf_offset.header.frame_id = "map";
+    tf_offset.header.stamp = rgb_image->header.stamp;
+    tf_offset.child_frame_id = "map_optic";
+    tf_offset.transform.translation.x = 0.0;
+    tf_offset.transform.translation.y = 0.0;
+    tf_offset.transform.translation.z = 0.0;
+    Eigen::Quaternionf q_tf_basecam(optic_in_base_.block<3, 3>(0, 0));
+    tf_offset.transform.rotation.w = q_tf_basecam.w();
+    tf_offset.transform.rotation.x = q_tf_basecam.x();
+    tf_offset.transform.rotation.y = q_tf_basecam.y();
+    tf_offset.transform.rotation.z = q_tf_basecam.z();
+    tfs.push_back(tf_offset);
+
+    broadcaster_.sendTransform(tfs);
     //Eigen::Matrix4d cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), imu_points).matrix().cast<double>();
     //cout<<"dt: "<<(ros::Time::now() - tic).toSec()<<endl;
 }
@@ -131,7 +181,7 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
     2. Yolo training (clear)
     3. Door -> detect room number (clear)
     4. Door -> Wall plane projection (dropped)
-    5. Floor, Room info to ORB SLAM
+    5. Floor, Room info to ORB SLAM (clear)
     6. Semantic Object as child node of graph node (Jinwhan's feedback. Generalizing for rooms with no number)
     7. Comparison 
     */
@@ -145,5 +195,39 @@ void SemanticSLAM::imuCallback(const sensor_msgs::ImuConstPtr& imu){
 }
 
 SemanticSLAM::~SemanticSLAM(){
-    
+    kill_flag_ = true;
+    keyframe_cv_.notify_all();
+    visual_odom_->Shutdown();
+}
+
+void SemanticSLAM::keyframeCallback(){
+    while(true){
+        unique_lock<mutex> key_lock(keyframe_lock_);
+        keyframe_cv_.wait(key_lock, [this]{return this->keyframe_updated_ || this->kill_flag_;});
+        if(kill_flag_){
+            thread_killed_ = true;
+            break;
+        }
+        vector<ORB_SLAM3::KeyFrame*> keys = visual_odom_->getKeyframes();
+        keyframe_updated_ = false;
+        key_lock.unlock();
+        sort(keys.begin(), keys.end(), [](ORB_SLAM3::KeyFrame* k1, ORB_SLAM3::KeyFrame* k2){
+            return k1->mnId < k2->mnId;
+        });
+        nav_msgs::Path path;
+        path.header.frame_id = "map_optic";
+        path.header.stamp = ros::Time::now();
+        for(int i = 0; i < keys.size(); ++i){
+            auto k = keys[i];
+            Eigen::Matrix4f pose = k->GetPose().matrix().inverse() * optic_in_base_.inverse();
+            geometry_msgs::PoseStamped p;
+            p.pose.position.x = pose(0, 3);
+            p.pose.position.y = pose(1, 3);
+            p.pose.position.z = pose(2, 3);
+            //cout<<p.pose.position.x<<" "<<p.pose.position.y<<" "<<p.pose.position.z<<endl;
+            path.poses.push_back(p);
+        }
+        pub_path_.publish(path);
+        
+    }
 }
