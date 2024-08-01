@@ -49,11 +49,12 @@ class SemanticSLAM{
         shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> depth_subscriber_;
         shared_ptr< message_filters::Synchronizer<sync_pol>> sync_;
         vector<cv::Scalar> colors_;
-        shared_ptr<LandmarkDetector> door_detector;
-        shared_ptr<LandmarkDetector> obj_detector;
+        shared_ptr<LandmarkDetector> door_detector_;
+        shared_ptr<LandmarkDetector> obj_detector_;
         vector<string> class_names_;
 
-        ros::Subscriber sub_detection_image_;
+        ros::Subscriber sub_sidecam_detection_;
+        ros::Subscriber sub_frontcam_detection_;
 
         ros::Subscriber sub_imu_;
 
@@ -70,7 +71,7 @@ class SemanticSLAM{
         
         void imuCallback(const sensor_msgs::ImuConstPtr& imu);
 
-        void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image);
+        void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const shared_ptr<LandmarkDetector>& detector);
     
         Eigen::Matrix4f optic_in_base_;
         //============Visualization===========

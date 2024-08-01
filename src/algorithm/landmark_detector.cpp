@@ -1,19 +1,5 @@
 #include <semantic_slam/algorithm/landmark_detector.h>
 #include <opencv2/dnn/dnn.hpp>
-// LandmarkDetector::LandmarkDetector(): pnh_("~"){
-//     class_names_ = {"floor_sign", "room_number"};
-    
-//     //============YOLOv8===============
-//     string yolo_model;
-//     pnh_.param<string>("yolo_model", yolo_model, "");
-//     network_ = cv::dnn::readNetFromONNX(yolo_model);
-//     //last_layer_names_ = network.getUnconnectedOutLayersNames();
-//     //=================================
-
-//     network_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-//     network_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
-
-// }
 
 LandmarkDetector::LandmarkDetector(const string& onnx, const vector<string>& class_names){
     class_names_ = class_names;
@@ -71,7 +57,7 @@ vector<Detection> LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image){
     for(int i = 0; i < rows; ++i){
         if(yolov8){
             float* classes_scores = data + 4;
-            int classes_num = 2;
+            int classes_num = class_names_.size();
             cv::Mat scores(1, classes_num, CV_32FC1, classes_scores);
             cv::Point class_id;
             double max_class_score;

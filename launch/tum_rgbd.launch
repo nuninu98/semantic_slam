@@ -5,11 +5,16 @@
         <param name="vocabulary_file" value="$(find semantic_slam)/model/ORBvoc.txt"/>
         <param name="setting_file" value="$(arg setting_file)"/>
 
-        <param name="text_graph" value="$(find semantic_slam)/model/mask_rcnn/mask_rcnn_inception_v2_coco_2018_01_28.pbtxt"/>
-        <param name="model_weights" value="$(find semantic_slam)/model/mask_rcnn/frozen_inference_graph.pb"/>
-        <param name="class_file" value="$(find semantic_slam)/model/mask_rcnn/object_detection_classes_coco.txt"/>
-        <param name="color_file" value="$(find semantic_slam)/model/mask_rcnn/colors.txt"/>
+        <param name="door_detection_onnx" value="/home/nuninu98/signage_detection.v1i.yolov8/runs/detect/train/weights/best.onnx"/>
         
+        <param name="obj_detection_onnx" value="/home/nuninu98/Downloads/yolov8n.onnx"/>
+        <param name="obj_detection_classes" value="$(find semantic_slam)/model/yolov8m_seg.txt"/>
+        
+
+        <param name="imu_topic" value="/d455/imu"/>
+    
+        <param name="crnn_file" value="/home/nuninu98/Downloads/crnn_cs.onnx"/>
+        <param name="text_list" value="/home/nuninu98/Downloads/alphabet_94.txt"/>
         <param name="rgb_topic" value="/camera/rgb/image_color"/>
         <param name="depth_topic" value="/camera/depth/image"/>
     </node>
