@@ -144,35 +144,49 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
     cv_bridge::CvImageConstPtr bridge = cv_bridge::toCvShare(color_image, "bgr8");
     cv::Mat image = bridge->image;
     vector<Detection> detections = door_detector->detectObjectYOLO(image);
-    vector<OCRDetection> text_detections = ocr_->detect_rec(image);
+    //vector<OCRDetection> text_detections = ocr_->detect_rec(image);
     vector<Detection> doors;
     for(auto& m : detections){
         //==========Testing Room Number=========
         if(m.getClassName() == "room_number"){
-            cv::Rect r1 = m.getRoI();
-            double max_iou = 0.2;
-            int max_iou_idx = -1;
-            for(int i = 0; i < text_detections.size(); ++i){
-                cv::Rect r2 = text_detections[i].getRoI();
-                cv::Rect common = (r1 & r2);
-                double iou = (double)common.area() / (double)(r1.area() + r2.area() - common.area());
-                if(iou > max_iou){
-                    max_iou = iou;
-                    max_iou_idx = i;
-                }
+            cv::Rect roi = m.getRoI();
+            OCRDetection text_out;
+            bool found_txt = ocr_->textRecognition(image, roi, text_out);
+            if(found_txt){
+                m.copyContent(text_out);
+                doors.push_back(m);
+                cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
+                cv::putText(image, text_out.getContent(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
             }
-            if(max_iou_idx == -1){
-                continue;
-            }
-            m.copyContent(text_detections[max_iou_idx]);
-            doors.push_back(m);
-            
-            cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
-            cv::putText(image, text_detections[max_iou_idx].getContent(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
         }
         else{
-
+            
         }
+        // if(m.getClassName() == "room_number"){
+        //     cv::Rect r1 = m.getRoI();
+        //     double max_iou = 0.2;
+        //     int max_iou_idx = -1;
+        //     for(int i = 0; i < text_detections.size(); ++i){
+        //         cv::Rect r2 = text_detections[i].getRoI();
+        //         cv::Rect common = (r1 & r2);
+        //         double iou = (double)common.area() / (double)(r1.area() + r2.area() - common.area());
+        //         if(iou > max_iou){
+        //             max_iou = iou;
+        //             max_iou_idx = i;
+        //         }
+        //     }
+        //     if(max_iou_idx == -1){
+        //         continue;
+        //     }
+        //     m.copyContent(text_detections[max_iou_idx]);
+        //     doors.push_back(m);
+            
+        //     cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
+        //     cv::putText(image, text_detections[max_iou_idx].getContent(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
+        // }
+        // else{
+
+        // }
         //====================================== 
     }
 

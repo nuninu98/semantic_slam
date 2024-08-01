@@ -130,6 +130,37 @@ void OCR::expandRectangle(const cv::Rect& input, double rate, cv::Rect& output){
     output = cv::Rect(topleft.x, topleft.y, w, h);
 }
 
+bool OCR::textRecognition(cv::Mat& frame, cv::Rect& roi, OCRDetection& output){
+    cv::Mat crop_hsv;
+    cv::Rect roi_expand;
+    expandRectangle(roi, 0.4, roi_expand);
+    cv::Rect image_size = cv::Rect(0, 0, frame.cols, frame.rows);
+    cv::Mat cropped = frame((roi_expand & image_size));
+    cv::cvtColor(cropped, crop_hsv, cv::COLOR_BGR2HSV);
+    vector<cv::Mat> hsv_hist;
+    cv::split(crop_hsv, hsv_hist);
+    cv::equalizeHist(hsv_hist[2], hsv_hist[2]);
+    cv::Mat hsv_eq;
+    cv::merge(hsv_hist, hsv_eq);
+    cv::Mat crop_v_eq;
+    cv::cvtColor(hsv_eq, crop_v_eq, cv::COLOR_HSV2BGR);
+    
+    string wordRecognized = recognizer->recognize(crop_v_eq);
+    if(all_of(wordRecognized.begin(), wordRecognized.end(), ::isdigit) && !wordRecognized.empty()){
+        if(wordRecognized.size() == 4){
+            OCRDetection text(roi, wordRecognized);
+            output = text;
+            return true;
+        }
+        // cv::putText(frame_copy, wordRecognized, vertices[1], cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 0, 255));
+        // cv::rectangle(frame_copy, roi_expand, cv::Scalar(0, 0, 255), 2);
+        // cv::imshow("Detected", crop_v_eq);
+        // cv::waitKey(1);
+    }
+    return false;
+    
+}
+
 
 vector<OCRDetection> OCR::detect_rec(cv::Mat& frame)
 {

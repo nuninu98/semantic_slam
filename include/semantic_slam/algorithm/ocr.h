@@ -36,6 +36,8 @@ class OCR
         OCR(string modelRecognition, string alphabet);
 		
         vector<OCRDetection> detect_rec(cv::Mat& frame);
+
+		bool textRecognition(cv::Mat& frame, cv::Rect& roi, OCRDetection& output);
 };
 
 #endif
