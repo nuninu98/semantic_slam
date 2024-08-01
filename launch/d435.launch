@@ -5,8 +5,10 @@
         <param name="vocabulary_file" value="$(find semantic_slam)/model/ORBvoc.txt"/>
         <param name="setting_file" value="$(arg setting_file)"/>
 
-        <param name="yolo_model" value="/home/nuninu98/signage_detection.v1i.yolov8/runs/detect/train/weights/best.onnx"/>
-        <param name="color_file" value="$(find semantic_slam)/model/mask_rcnn/colors.txt"/>
+        <param name="door_detection_onnx" value="/home/nuninu98/signage_detection.v1i.yolov8/runs/detect/train/weights/best.onnx"/>
+        
+        <param name="obj_detection_onnx" value="$(find semantic_slam)/model/yolov8m-seg.onnx"/>
+        <param name="obj_detection_classes" value="$(find semantic_slam)/model/yolov8m_seg.txt"/>
         
         <param name="rgb_topic" value="/d455/color/image_raw"/>
         <param name="depth_topic" value="/d455/aligned_depth_to_color/image_raw"/>

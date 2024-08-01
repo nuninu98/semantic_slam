@@ -21,15 +21,17 @@ const double NMS_TRESHOLD = 0.4;
 class LandmarkDetector{
     private:
         vector<string> class_names_;
-        ros::NodeHandle pnh_;
+        //ros::NodeHandle pnh_;
         mutex lock_camera_;
-        cv::dnn::Net signage_network_;
+        cv::dnn::Net network_;
         //vector<string> last_layer_names_;
         
         cv::Mat formatToSquare(const cv::Mat& source);
     
     public:
-        LandmarkDetector();
+        //LandmarkDetector();
+
+        LandmarkDetector(const string& onnx, const vector<string>& class_names);
 
         ~LandmarkDetector();
         

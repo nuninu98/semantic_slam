@@ -49,7 +49,8 @@ class SemanticSLAM{
         shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> depth_subscriber_;
         shared_ptr< message_filters::Synchronizer<sync_pol>> sync_;
         vector<cv::Scalar> colors_;
-        LandmarkDetector ld_;
+        shared_ptr<LandmarkDetector> door_detector;
+        shared_ptr<LandmarkDetector> obj_detector;
         vector<string> class_names_;
 
         ros::Subscriber sub_detection_image_;

@@ -13,6 +13,24 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     string text_list;
     pnh_.param<string>("text_list", text_list, "");
 
+    string door_detection_onnx;
+    pnh_.param<string>("door_detection_onnx", door_detection_onnx, "");
+    vector<string> door_detection_classes = {"floor_sign", "room_number"};
+    door_detector.reset(new LandmarkDetector(door_detection_onnx, door_detection_classes));
+
+    string obj_detection_onnx;
+    pnh_.param<string>("obj_detection_onnx", obj_detection_onnx, "");
+    string obj_detection_classes_file;
+    pnh_.param<string>("obj_detection_classes", obj_detection_classes_file, "");
+    vector<string> obj_detection_classes;
+    ifstream file(obj_detection_classes_file);
+    string line;
+    while(getline(file, line)){
+        obj_detection_classes.push_back(line);
+    }
+    obj_detector.reset(new LandmarkDetector(obj_detection_onnx, obj_detection_classes));
+    
+
     ocr_.reset(new OCR(crnn_file, text_list));
 
     optic_in_base_ = Eigen::Matrix4f::Identity();
@@ -25,19 +43,6 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
 
     pub_path_ = nh_.advertise<nav_msgs::Path>("slam_path", 1);
 
-    string color_file;
-    pnh_.param<string>("color_file", color_file, "");
-    ifstream ifs(color_file.c_str());
-    string line;
-    while(getline(ifs, line)){
-        char* pEnd;
-        double r, g, b;
-        r = strtod(line.c_str(), &pEnd);
-        g = strtod(pEnd, &pEnd);
-        b = strtod(pEnd, NULL);
-        colors_.push_back(cv::Scalar(r, g, b, 255.0));
-    }
-    class_names_ = ld_.getClassNames();
     visual_odom_ = new ORB_SLAM3::System(voc_file, setting_file ,ORB_SLAM3::System::RGBD, false);
     visual_odom_->registerKeyframeCall(&keyframe_updated_, &keyframe_cv_);
     keyframe_thread_ = thread(&SemanticSLAM::keyframeCallback, this);
@@ -96,7 +101,7 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
     keyframe_lock_.lock();
     ros::Time tic = ros::Time::now();
     Eigen::Matrix4f cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), detections, imu_points).matrix();
-    cout<<(ros::Time::now() - tic).toSec()*1000.0<<"ms"<<endl;
+    //cout<<(ros::Time::now() - tic).toSec()*1000.0<<"ms"<<endl;
     keyframe_lock_.unlock();
     Eigen::Matrix4f optic_in_map = cam_extrinsic.inverse();
     Eigen::Matrix4f base_in_map = optic_in_map * optic_in_base_.inverse();
@@ -138,7 +143,7 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
 void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image){
     cv_bridge::CvImageConstPtr bridge = cv_bridge::toCvShare(color_image, "bgr8");
     cv::Mat image = bridge->image;
-    vector<Detection> detections = ld_.detectObjectYOLO(image);
+    vector<Detection> detections = door_detector->detectObjectYOLO(image);
     vector<OCRDetection> text_detections = ocr_->detect_rec(image);
     vector<Detection> doors;
     for(auto& m : detections){
@@ -164,6 +169,9 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
             
             cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
             cv::putText(image, text_detections[max_iou_idx].getContent(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
+        }
+        else{
+
         }
         //====================================== 
     }

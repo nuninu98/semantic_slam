@@ -1,18 +1,25 @@
 #include <semantic_slam/algorithm/landmark_detector.h>
 #include <opencv2/dnn/dnn.hpp>
-LandmarkDetector::LandmarkDetector(): pnh_("~"){
-    class_names_ = {"floor_sign", "room_number"};
+// LandmarkDetector::LandmarkDetector(): pnh_("~"){
+//     class_names_ = {"floor_sign", "room_number"};
     
-    //============YOLOv8===============
-    string yolo_model;
-    pnh_.param<string>("yolo_model", yolo_model, "");
-    signage_network_ = cv::dnn::readNetFromONNX(yolo_model);
-    //last_layer_names_ = signage_network_.getUnconnectedOutLayersNames();
-    //=================================
+//     //============YOLOv8===============
+//     string yolo_model;
+//     pnh_.param<string>("yolo_model", yolo_model, "");
+//     network_ = cv::dnn::readNetFromONNX(yolo_model);
+//     //last_layer_names_ = network.getUnconnectedOutLayersNames();
+//     //=================================
 
-    signage_network_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-    signage_network_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+//     network_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+//     network_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
 
+// }
+
+LandmarkDetector::LandmarkDetector(const string& onnx, const vector<string>& class_names){
+    class_names_ = class_names;
+    network_ = cv::dnn::readNetFromONNX(onnx);
+    network_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+    network_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
 }
 
 LandmarkDetector::~LandmarkDetector(){
@@ -37,11 +44,11 @@ vector<Detection> LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image){
     
     // cv::Size model_shape = rgb_image.size();
     // cv::Mat blob = cv::dnn::blobFromImage(model_input, 1.0 /255.0, model_shape, cv::Scalar(), true, false);
-    signage_network_.setInput(blob);
+    network_.setInput(blob);
     //========================Simple detection=======================
     vector<cv::Mat> outputs;
     ros::Time tic = ros::Time::now();
-    signage_network_.forward(outputs, signage_network_.getUnconnectedOutLayersNames());
+    network_.forward(outputs, network_.getUnconnectedOutLayersNames());
     int rows = outputs[0].size[1];
     int dimensions = outputs[0].size[2];
     bool yolov8 = false;
