@@ -42,6 +42,8 @@ typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sens
 
 class SemanticSLAM{
     private:
+        Eigen::Matrix4f OPTIC_TF = (Eigen::Matrix4f()<< 0, 0, 1, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 1).finished();
+
         ros::NodeHandle nh_;
         ros::NodeHandle pnh_;
         ORB_SLAM3::System* visual_odom_;
@@ -71,9 +73,9 @@ class SemanticSLAM{
         
         void imuCallback(const sensor_msgs::ImuConstPtr& imu);
 
-        void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const shared_ptr<LandmarkDetector>& detector);
+        void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const shared_ptr<LandmarkDetector>& detector, const Eigen::Matrix4f& sensor_pose);
     
-        Eigen::Matrix4f optic_in_base_;
+        Eigen::Matrix4f sidecam_in_frontcam_; // optic
         //============Visualization===========
         bool kill_flag_;
         bool thread_killed_;

@@ -33,13 +33,15 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
 
     ocr_.reset(new OCR(crnn_file, text_list));
 
-    optic_in_base_ = Eigen::Matrix4f::Identity();
-    optic_in_base_(0, 0) = 0.0;
-    optic_in_base_(0, 2) = 1.0;
-    optic_in_base_(1, 0) = -1.0;
-    optic_in_base_(1, 1) = 0.0;
-    optic_in_base_(2, 1) = -1.0;
-    optic_in_base_(2, 2) = 0.0;
+    sidecam_in_frontcam_ = Eigen::Matrix4f::Identity();
+    sidecam_in_frontcam_(0, 0) = 0.0;
+    sidecam_in_frontcam_(0, 2) = 1.0;
+    sidecam_in_frontcam_(2, 0) = -1.0;
+    sidecam_in_frontcam_(2, 2) = 0.0;
+
+    sidecam_in_frontcam_(0, 3) = 0.065;
+    sidecam_in_frontcam_(1, 3) = 0.0;
+    sidecam_in_frontcam_(2, 3) = -0.065;
 
     pub_path_ = nh_.advertise<nav_msgs::Path>("slam_path", 1);
 
@@ -54,8 +56,8 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     pnh_.param<string>("depth_topic", depth_topic, "/camera/aligned_depth_to_color/image_raw");
     pnh_.param<string>("imu_topic", imu_topic, "/imu/data");
 
-    sub_sidecam_detection_ = nh_.subscribe<sensor_msgs::Image>("/d435/color/image_raw", 1, boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, door_detector_));
-    sub_frontcam_detection_ = nh_.subscribe<sensor_msgs::Image>(rgb_topic, 1, boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, obj_detector_));
+    sub_sidecam_detection_ = nh_.subscribe<sensor_msgs::Image>("/d435/color/image_raw", 1, boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, door_detector_, sidecam_in_frontcam_));
+    //sub_frontcam_detection_ = nh_.subscribe<sensor_msgs::Image>(rgb_topic, 1, boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, obj_detector_));
 
     rgb_subscriber_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, rgb_topic, 1));
     depth_subscriber_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, depth_topic, 1));
@@ -100,14 +102,13 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
         obj_detection_buf_.pop();
     }
     object_lock_.unlock();
-    
     keyframe_lock_.lock();
     ros::Time tic = ros::Time::now();
     Eigen::Matrix4f cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), detections, imu_points).matrix();
     //cout<<(ros::Time::now() - tic).toSec()*1000.0<<"ms"<<endl;
     keyframe_lock_.unlock();
     Eigen::Matrix4f optic_in_map = cam_extrinsic.inverse();
-    Eigen::Matrix4f base_in_map = optic_in_map * optic_in_base_.inverse();
+    Eigen::Matrix4f base_in_map = optic_in_map * OPTIC_TF.inverse();
 
     vector<geometry_msgs::TransformStamped> tfs;
     geometry_msgs::TransformStamped tf;
@@ -131,7 +132,7 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
     tf_offset.transform.translation.x = 0.0;
     tf_offset.transform.translation.y = 0.0;
     tf_offset.transform.translation.z = 0.0;
-    Eigen::Quaternionf q_tf_basecam(optic_in_base_.block<3, 3>(0, 0));
+    Eigen::Quaternionf q_tf_basecam(OPTIC_TF.block<3, 3>(0, 0));
     tf_offset.transform.rotation.w = q_tf_basecam.w();
     tf_offset.transform.rotation.x = q_tf_basecam.x();
     tf_offset.transform.rotation.y = q_tf_basecam.y();
@@ -143,13 +144,15 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
     //cout<<"dt: "<<(ros::Time::now() - tic).toSec()<<endl;
 }
 
-void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const shared_ptr<LandmarkDetector>& detector){
+void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const shared_ptr<LandmarkDetector>& detector, const Eigen::Matrix4f& sensor_pose){
     cv_bridge::CvImageConstPtr bridge = cv_bridge::toCvShare(color_image, "bgr8");
     cv::Mat image = bridge->image;
     vector<Detection> detections = detector->detectObjectYOLO(image);
     //vector<OCRDetection> text_detections = ocr_->detect_rec(image);
     vector<Detection> doors;
+    
     for(auto& m : detections){
+        m.sensor_pose_ = sensor_pose;
         //==========Testing Room Number=========
         if(m.getClassName() == "room_number"){
             cv::Rect roi = m.getRoI();
@@ -166,33 +169,8 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
             cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
             cv::putText(image, m.getClassName(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
         }
-        // if(m.getClassName() == "room_number"){
-        //     cv::Rect r1 = m.getRoI();
-        //     double max_iou = 0.2;
-        //     int max_iou_idx = -1;
-        //     for(int i = 0; i < text_detections.size(); ++i){
-        //         cv::Rect r2 = text_detections[i].getRoI();
-        //         cv::Rect common = (r1 & r2);
-        //         double iou = (double)common.area() / (double)(r1.area() + r2.area() - common.area());
-        //         if(iou > max_iou){
-        //             max_iou = iou;
-        //             max_iou_idx = i;
-        //         }
-        //     }
-        //     if(max_iou_idx == -1){
-        //         continue;
-        //     }
-        //     m.copyContent(text_detections[max_iou_idx]);
-        //     doors.push_back(m);
-            
-        //     cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
-        //     cv::putText(image, text_detections[max_iou_idx].getContent(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
-        // }
-        // else{
-
-        // }
-        //====================================== 
     }
+   
 
     if(!doors.empty()){
         object_lock_.lock();
@@ -252,7 +230,7 @@ void SemanticSLAM::keyframeCallback(){
         path.header.stamp = ros::Time::now();
         for(int i = 0; i < keys.size(); ++i){
             auto k = keys[i];
-            Eigen::Matrix4f pose = k->GetPose().matrix().inverse() * optic_in_base_.inverse();
+            Eigen::Matrix4f pose = k->GetPose().matrix().inverse() * OPTIC_TF.inverse();
             geometry_msgs::PoseStamped p;
             p.pose.position.x = pose(0, 3);
             p.pose.position.y = pose(1, 3);

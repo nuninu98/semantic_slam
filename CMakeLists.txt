@@ -175,6 +175,8 @@ add_library(semantic_slam_algorithm
 )
 target_link_libraries(semantic_slam_algorithm
   ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${EIGEN3_LIBS}
   ${ORB_SLAM3_DIR}/lib/libORB_SLAM3.so
   #semantic_slam_dtype
   gtsam
@@ -187,12 +189,9 @@ add_library(semantic_slam_api
 target_link_libraries(semantic_slam_api
   ${catkin_LIBRARIES}
   ${Pangolin_LIBRARIES}
-  ${PCL_LIBRARIES}
   ${OpenCV_LIBS} 
   gtsam
   semantic_slam_algorithm
-  ${EIGEN3_LIBS}
-  
 )
 
 ## Add cmake target dependencies of the library
