@@ -47,16 +47,21 @@ class SemanticSLAM{
         ros::NodeHandle nh_;
         ros::NodeHandle pnh_;
         ORB_SLAM3::System* visual_odom_;
-        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> rgb_subscriber_;
-        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> depth_subscriber_;
-        shared_ptr< message_filters::Synchronizer<sync_pol>> sync_;
+        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> tracking_color_;
+        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> tracking_depth_;
+        shared_ptr< message_filters::Synchronizer<sync_pol>> tracking_sync_;
+
+        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> detection_color_;
+        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> detection_depth_;
+        shared_ptr< message_filters::Synchronizer<sync_pol>> detection_sync_;
+
         vector<cv::Scalar> colors_;
         shared_ptr<LandmarkDetector> door_detector_;
         shared_ptr<LandmarkDetector> obj_detector_;
         vector<string> class_names_;
 
-        ros::Subscriber sub_sidecam_detection_;
-        ros::Subscriber sub_frontcam_detection_;
+        //ros::Subscriber sub_sidecam_detection_;
+        //ros::Subscriber sub_frontcam_detection_;
 
         ros::Subscriber sub_imu_;
 
@@ -67,14 +72,15 @@ class SemanticSLAM{
         queue<sensor_msgs::Imu> imu_buf_;
 
         mutex object_lock_;
-        queue<pair<ros::Time, vector<Detection>>> obj_detection_buf_;
-
+        Eigen::Matrix3f K_side_;
+        //queue<pair<ros::Time, vector<Detection>>> obj_detection_buf_;
+        queue<DetectionGroup> obj_detection_buf_;
         void trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image);
         
         void imuCallback(const sensor_msgs::ImuConstPtr& imu);
 
-        void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const shared_ptr<LandmarkDetector>& detector, const Eigen::Matrix4f& sensor_pose);
-    
+        //void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const shared_ptr<LandmarkDetector>& detector, const Eigen::Matrix4f& sensor_pose);
+        void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, const Eigen::Matrix4f& sensor_pose);
         Eigen::Matrix4f sidecam_in_frontcam_; // optic
         //============Visualization===========
         bool kill_flag_;
@@ -90,6 +96,7 @@ class SemanticSLAM{
         ros::Publisher pub_path_;
         //====================================
     public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         SemanticSLAM();
 
         ~SemanticSLAM();

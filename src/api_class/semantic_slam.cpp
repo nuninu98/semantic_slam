@@ -38,10 +38,15 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     sidecam_in_frontcam_(0, 2) = 1.0;
     sidecam_in_frontcam_(2, 0) = -1.0;
     sidecam_in_frontcam_(2, 2) = 0.0;
-
     sidecam_in_frontcam_(0, 3) = 0.065;
     sidecam_in_frontcam_(1, 3) = 0.0;
     sidecam_in_frontcam_(2, 3) = -0.065;
+
+    K_side_ = Eigen::Matrix3f::Identity();
+    K_side_(0, 0) = 927.8262329101562;
+    K_side_(0, 2) = 658.4143676757812;
+    K_side_(1, 1) = 928.4344482421875;
+    K_side_(1, 2) = 359.071044921875;
 
     pub_path_ = nh_.advertise<nav_msgs::Path>("slam_path", 1);
 
@@ -56,14 +61,18 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     pnh_.param<string>("depth_topic", depth_topic, "/camera/aligned_depth_to_color/image_raw");
     pnh_.param<string>("imu_topic", imu_topic, "/imu/data");
 
-    sub_sidecam_detection_ = nh_.subscribe<sensor_msgs::Image>("/d435/color/image_raw", 1, boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, door_detector_, sidecam_in_frontcam_));
+    //sub_sidecam_detection_ = nh_.subscribe<sensor_msgs::Image>("/d435/color/image_raw", 1, boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, door_detector_, sidecam_in_frontcam_));
     //sub_frontcam_detection_ = nh_.subscribe<sensor_msgs::Image>(rgb_topic, 1, boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, obj_detector_));
 
-    rgb_subscriber_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, rgb_topic, 1));
-    depth_subscriber_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, depth_topic, 1));
-    
-    sync_.reset(new message_filters::Synchronizer<sync_pol> (sync_pol(1000), *rgb_subscriber_, *depth_subscriber_));
-    sync_->registerCallback(boost::bind(&SemanticSLAM::trackingImageCallback, this, _1, _2));
+    tracking_color_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, rgb_topic, 1));
+    tracking_depth_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, depth_topic, 1));
+    tracking_sync_.reset(new message_filters::Synchronizer<sync_pol> (sync_pol(1000), *tracking_color_, *tracking_depth_));
+    tracking_sync_->registerCallback(boost::bind(&SemanticSLAM::trackingImageCallback, this, _1, _2));
+
+    detection_color_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, "/d435/color/image_raw", 1));
+    detection_depth_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, "/d435/aligned_depth_to_color/image_raw", 1));
+    detection_sync_.reset(new message_filters::Synchronizer<sync_pol> (sync_pol(1000), *detection_color_, *detection_depth_));
+    detection_sync_->registerCallback(boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, _2, sidecam_in_frontcam_));
 }
 
 void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image){
@@ -87,24 +96,22 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
     }
     imu_lock_.unlock();
 
-    vector<Detection> detections;
+    vector<DetectionGroup> detection_groups;
     object_lock_.lock();
     while(!obj_detection_buf_.empty()){
-        double obj_stamp = obj_detection_buf_.front().first.toSec();
+        double obj_stamp = obj_detection_buf_.front().stamp();
         if(obj_stamp > stamp.toSec()){
             break;
         }
         if(stamp.toSec() - obj_stamp < 0.1){
-            for(const auto& elem : obj_detection_buf_.front().second){
-                detections.push_back(elem);
-            }
+            detection_groups.push_back(obj_detection_buf_.front());
         }
         obj_detection_buf_.pop();
     }
     object_lock_.unlock();
     keyframe_lock_.lock();
     ros::Time tic = ros::Time::now();
-    Eigen::Matrix4f cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), detections, imu_points).matrix();
+    Eigen::Matrix4f cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), detection_groups, imu_points).matrix();
     //cout<<(ros::Time::now() - tic).toSec()*1000.0<<"ms"<<endl;
     keyframe_lock_.unlock();
     Eigen::Matrix4f optic_in_map = cam_extrinsic.inverse();
@@ -144,15 +151,16 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
     //cout<<"dt: "<<(ros::Time::now() - tic).toSec()<<endl;
 }
 
-void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const shared_ptr<LandmarkDetector>& detector, const Eigen::Matrix4f& sensor_pose){
-    cv_bridge::CvImageConstPtr bridge = cv_bridge::toCvShare(color_image, "bgr8");
-    cv::Mat image = bridge->image;
-    vector<Detection> detections = detector->detectObjectYOLO(image);
+void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, const Eigen::Matrix4f& sensor_pose){
+    cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(color_image, "bgr8");
+    cv_bridge::CvImageConstPtr cv_depth_bridge = cv_bridge::toCvShare(depth_image, depth_image->encoding);
+    cv::Mat image = cv_rgb_bridge->image;
+    vector<Detection> detections = door_detector_->detectObjectYOLO(image);
     //vector<OCRDetection> text_detections = ocr_->detect_rec(image);
     vector<Detection> doors;
     
     for(auto& m : detections){
-        m.sensor_pose_ = sensor_pose;
+        //m.sensor_pose_ = sensor_pose;
         //==========Testing Room Number=========
         if(m.getClassName() == "room_number"){
             cv::Rect roi = m.getRoI();
@@ -173,19 +181,15 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
    
 
     if(!doors.empty()){
+        cv::Mat color_mat = cv_rgb_bridge->image.clone();
+        cv::Mat depth_mat = cv_depth_bridge->image.clone();
+        DetectionGroup dg(color_mat, depth_mat, sensor_pose, doors, K_side_, color_image->header.stamp.toSec());
         object_lock_.lock();
-        obj_detection_buf_.push(make_pair(color_image->header.stamp, doors));
+        obj_detection_buf_.push(dg);
         object_lock_.unlock();
     }
-    if(detector == door_detector_){
-        cv::imshow("door detection", image);
-        cv::waitKey(1);
-    }
-    else{
-        cv::imshow("obj detection", image);
-        cv::waitKey(1);
-    }
-    
+    cv::imshow("door detection", image);
+    cv::waitKey(1);
     //============TODO===============
     /*
     1. Door + Floor sign dataset (clear)
@@ -198,6 +202,61 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
     */
     //===============================
 }
+
+// void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const shared_ptr<LandmarkDetector>& detector, const Eigen::Matrix4f& sensor_pose){
+//     cv_bridge::CvImageConstPtr bridge = cv_bridge::toCvShare(color_image, "bgr8");
+//     cv::Mat image = bridge->image;
+//     vector<Detection> detections = detector->detectObjectYOLO(image);
+//     //vector<OCRDetection> text_detections = ocr_->detect_rec(image);
+//     vector<Detection> doors;
+    
+//     for(auto& m : detections){
+//         m.sensor_pose_ = sensor_pose;
+//         //==========Testing Room Number=========
+//         if(m.getClassName() == "room_number"){
+//             cv::Rect roi = m.getRoI();
+//             OCRDetection text_out;
+//             bool found_txt = ocr_->textRecognition(image, roi, text_out);
+//             if(found_txt){
+//                 m.copyContent(text_out);
+//                 doors.push_back(m);
+//                 cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
+//                 cv::putText(image, text_out.getContent(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
+//             }
+//         }
+//         else{
+//             cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
+//             cv::putText(image, m.getClassName(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
+//         }
+//     }
+   
+
+//     if(!doors.empty()){
+//         object_lock_.lock();
+//         obj_detection_buf_.push(make_pair(color_image->header.stamp, doors));
+//         object_lock_.unlock();
+//     }
+//     if(detector == door_detector_){
+//         cv::imshow("door detection", image);
+//         cv::waitKey(1);
+//     }
+//     else{
+//         cv::imshow("obj detection", image);
+//         cv::waitKey(1);
+//     }
+    
+//     //============TODO===============
+//     /*
+//     1. Door + Floor sign dataset (clear)
+//     2. Yolo training (clear)
+//     3. Door -> detect room number (clear)
+//     4. Door -> Wall plane projection (dropped)
+//     5. Floor, Room info to ORB SLAM (clear)
+//     6. Semantic Object as child node of graph node (Jinwhan's feedback. Generalizing for rooms with no number)
+//     7. Comparison 
+//     */
+//     //===============================
+// }
 
 void SemanticSLAM::imuCallback(const sensor_msgs::ImuConstPtr& imu){
     imu_lock_.lock();

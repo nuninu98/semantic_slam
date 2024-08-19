@@ -8,11 +8,27 @@ project(semantic_slam)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 
-set(CMAKE_BUILD_TYPE "Release")
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Ofast -DNDEBUG -Wno-deprecated-declarations")
-#set(CMAKE_CXX_FLAGS "-std=c++14")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall   -O3")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall   -O3")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -march=native")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
+
+# Check C++14 or C++0x support
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX11)
+CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+if(COMPILER_SUPPORTS_CXX11)
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+   add_definitions(-DCOMPILEDWITHC11)
+   message(STATUS "Using flag -std=c++14.")
+elseif(COMPILER_SUPPORTS_CXX0X)
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+   add_definitions(-DCOMPILEDWITHC0X)
+   message(STATUS "Using flag -std=c++0x.")
+else()
+   message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++14 support. Please use a different C++ compiler.")
+endif()
 
 set(ORB_SLAM3_DIR
    $ENV{HOME}/ORB_SLAM3_semantic
@@ -178,6 +194,7 @@ target_link_libraries(semantic_slam_algorithm
   ${PCL_LIBRARIES}
   ${EIGEN3_LIBS}
   ${ORB_SLAM3_DIR}/lib/libORB_SLAM3.so
+  ${ORB_SLAM3_DIR}/lib/libORB_SLAM3_DATA_TYPE.so
   #semantic_slam_dtype
   gtsam
 )
