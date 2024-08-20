@@ -1,5 +1,5 @@
 #include <semantic_slam/api_class/semantic_slam.h>
-SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false), keyframe_updated_(false){
+SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false), keyframe_updated_(false), depth_factor_(1000.0){
 
     string voc_file;
     pnh_.param<string>("vocabulary_file", voc_file, "/home/nuninu98/catkin_ws/src/orb_semantic_slam/model/ORBvoc.txt");
@@ -60,6 +60,9 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     pnh_.param<string>("rgb_topic", rgb_topic, "/camera/color/image_raw");
     pnh_.param<string>("depth_topic", depth_topic, "/camera/aligned_depth_to_color/image_raw");
     pnh_.param<string>("imu_topic", imu_topic, "/imu/data");
+
+    pub_object_cloud_ = nh_.advertise<sensor_msgs::PointCloud2>("object_cloud", 1);
+    pub_object_label_ = nh_.advertise<visualization_msgs::MarkerArray>("object_label", 1);
 
     //sub_sidecam_detection_ = nh_.subscribe<sensor_msgs::Image>("/d435/color/image_raw", 1, boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, door_detector_, sidecam_in_frontcam_));
     //sub_frontcam_detection_ = nh_.subscribe<sensor_msgs::Image>(rgb_topic, 1, boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, obj_detector_));
@@ -154,7 +157,7 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
 void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, const Eigen::Matrix4f& sensor_pose){
     cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(color_image, "bgr8");
     cv_bridge::CvImageConstPtr cv_depth_bridge = cv_bridge::toCvShare(depth_image, depth_image->encoding);
-    cv::Mat image = cv_rgb_bridge->image;
+    cv::Mat image = cv_rgb_bridge->image.clone();
     vector<Detection> detections = door_detector_->detectObjectYOLO(image);
     //vector<OCRDetection> text_detections = ocr_->detect_rec(image);
     vector<Detection> doors;
@@ -183,7 +186,12 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
     if(!doors.empty()){
         cv::Mat color_mat = cv_rgb_bridge->image.clone();
         cv::Mat depth_mat = cv_depth_bridge->image.clone();
-        DetectionGroup dg(color_mat, depth_mat, sensor_pose, doors, K_side_, color_image->header.stamp.toSec());
+        cv::Mat depth_scaled;
+        if((fabs(depth_factor_-1.0)>1e-5) || depth_mat.type()!=CV_32F){
+            depth_mat.convertTo(depth_scaled,CV_32F, 1.0/depth_factor_);
+        }
+
+        DetectionGroup dg(color_mat, depth_scaled, sensor_pose, doors, K_side_, color_image->header.stamp.toSec());
         object_lock_.lock();
         obj_detection_buf_.push(dg);
         object_lock_.unlock();
@@ -298,6 +306,21 @@ void SemanticSLAM::keyframeCallback(){
             path.poses.push_back(p);
         }
         pub_path_.publish(path);
-        
+
+        unordered_map<int, vector<Object*>> h_graph;
+        visual_odom_->getHierarchyGraph(h_graph);
+        pcl::PointCloud<pcl::PointXYZRGB> obj_cloud;
+        for(const auto& fo_pair : h_graph){
+            for(const auto& obj : fo_pair.second){
+                pcl::PointCloud<pcl::PointXYZRGB> ocl;
+                obj->getCloud(ocl);
+                obj_cloud += ocl;
+            }
+        }
+        sensor_msgs::PointCloud2 obj_cloud_ros;
+        pcl::toROSMsg(obj_cloud, obj_cloud_ros);
+        obj_cloud_ros.header.frame_id = "map_optic";
+        obj_cloud_ros.header.stamp = ros::Time::now();
+        pub_object_cloud_.publish(obj_cloud_ros);
     }
 }

@@ -30,12 +30,16 @@
 #include <semantic_slam/algorithm/landmark_detector.h>
 #include <semantic_slam/algorithm/ocr.h>
 #include <sensor_msgs/Imu.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <mutex>
 #include <queue>
 #include <thread>
 #include <condition_variable>
 #include <tf2_ros/transform_broadcaster.h>
 #include <nav_msgs/Path.h>
+#include <visualization_msgs/MarkerArray.h>
+#include <pcl/conversions.h>
+#include <pcl_conversions/pcl_conversions.h>
 using namespace std;
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
@@ -82,6 +86,8 @@ class SemanticSLAM{
         //void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const shared_ptr<LandmarkDetector>& detector, const Eigen::Matrix4f& sensor_pose);
         void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, const Eigen::Matrix4f& sensor_pose);
         Eigen::Matrix4f sidecam_in_frontcam_; // optic
+        double depth_factor_;
+
         //============Visualization===========
         bool kill_flag_;
         bool thread_killed_;
@@ -94,6 +100,9 @@ class SemanticSLAM{
 
         tf2_ros::TransformBroadcaster broadcaster_;
         ros::Publisher pub_path_;
+
+        ros::Publisher pub_object_cloud_;
+        ros::Publisher pub_object_label_;
         //====================================
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
