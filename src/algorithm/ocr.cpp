@@ -130,7 +130,7 @@ void OCR::expandRectangle(const cv::Rect& input, double rate, cv::Rect& output){
     output = cv::Rect(topleft.x, topleft.y, w, h);
 }
 
-bool OCR::textRecognition(cv::Mat& frame, cv::Rect& roi, OCRDetection& output){
+bool OCR::textRecognition(cv::Mat& frame, cv::Rect& roi, ORB_SLAM3::OCRDetection& output){
     cv::Mat crop_hsv;
     cv::Rect roi_expand;
     expandRectangle(roi, 0.4, roi_expand);
@@ -148,7 +148,7 @@ bool OCR::textRecognition(cv::Mat& frame, cv::Rect& roi, OCRDetection& output){
     string wordRecognized = recognizer->recognize(crop_v_eq);
     if(all_of(wordRecognized.begin(), wordRecognized.end(), ::isdigit) && !wordRecognized.empty()){
         if(wordRecognized.size() == 4){
-            OCRDetection text(roi, wordRecognized);
+            ORB_SLAM3::OCRDetection text(roi, wordRecognized);
             output = text;
             return true;
         }
@@ -162,9 +162,9 @@ bool OCR::textRecognition(cv::Mat& frame, cv::Rect& roi, OCRDetection& output){
 }
 
 
-vector<OCRDetection> OCR::detect_rec(cv::Mat& frame)
+vector<ORB_SLAM3::OCRDetection> OCR::detect_rec(cv::Mat& frame)
 {
-    vector<OCRDetection> output;
+    vector<ORB_SLAM3::OCRDetection> output;
 
     vector<cv::Mat> outs;
     vector<string> outNames(2);
@@ -241,7 +241,7 @@ vector<OCRDetection> OCR::detect_rec(cv::Mat& frame)
                 string wordRecognized = recognizer->recognize(crop_v_eq);
                 if(all_of(wordRecognized.begin(), wordRecognized.end(), ::isdigit) && !wordRecognized.empty()){
                     if(wordRecognized.size() == 4){
-                        OCRDetection text(roi, wordRecognized);
+                        ORB_SLAM3::OCRDetection text(roi, wordRecognized);
                         output.push_back(text);
                     }
                     // cv::putText(frame_copy, wordRecognized, vertices[1], cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 0, 255));

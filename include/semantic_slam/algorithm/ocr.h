@@ -35,9 +35,9 @@ class OCR
 		//Net recognizer;
         OCR(string modelRecognition, string alphabet);
 		
-        vector<OCRDetection> detect_rec(cv::Mat& frame);
+        vector<ORB_SLAM3::OCRDetection> detect_rec(cv::Mat& frame);
 
-		bool textRecognition(cv::Mat& frame, cv::Rect& roi, OCRDetection& output);
+		bool textRecognition(cv::Mat& frame, cv::Rect& roi, ORB_SLAM3::OCRDetection& output);
 };
 
 #endif

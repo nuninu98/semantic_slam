@@ -78,13 +78,13 @@ class SemanticSLAM{
         mutex object_lock_;
         Eigen::Matrix3f K_side_;
         //queue<pair<ros::Time, vector<Detection>>> obj_detection_buf_;
-        queue<DetectionGroup> obj_detection_buf_;
+        queue<ORB_SLAM3::DetectionGroup> obj_detection_buf_;
         void trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image);
         
         void imuCallback(const sensor_msgs::ImuConstPtr& imu);
 
         //void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const shared_ptr<LandmarkDetector>& detector, const Eigen::Matrix4f& sensor_pose);
-        void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, const Eigen::Matrix4f& sensor_pose);
+        void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, const Eigen::Matrix4f& sensor_pose, const Eigen::Matrix3f& K);
         Eigen::Matrix4f sidecam_in_frontcam_; // optic
         double depth_factor_;
 

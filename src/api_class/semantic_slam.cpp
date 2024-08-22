@@ -75,7 +75,7 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     detection_color_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, "/d435/color/image_raw", 1));
     detection_depth_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, "/d435/aligned_depth_to_color/image_raw", 1));
     detection_sync_.reset(new message_filters::Synchronizer<sync_pol> (sync_pol(1000), *detection_color_, *detection_depth_));
-    detection_sync_->registerCallback(boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, _2, sidecam_in_frontcam_));
+    detection_sync_->registerCallback(boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, _2, sidecam_in_frontcam_, K_side_));
 }
 
 void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image){
@@ -99,7 +99,7 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
     }
     imu_lock_.unlock();
 
-    vector<DetectionGroup> detection_groups;
+    vector<ORB_SLAM3::DetectionGroup> detection_groups;
     object_lock_.lock();
     while(!obj_detection_buf_.empty()){
         double obj_stamp = obj_detection_buf_.front().stamp();
@@ -154,20 +154,20 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
     //cout<<"dt: "<<(ros::Time::now() - tic).toSec()<<endl;
 }
 
-void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, const Eigen::Matrix4f& sensor_pose){
+void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, const Eigen::Matrix4f& sensor_pose, const Eigen::Matrix3f& K){
     cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(color_image, "bgr8");
     cv_bridge::CvImageConstPtr cv_depth_bridge = cv_bridge::toCvShare(depth_image, depth_image->encoding);
     cv::Mat image = cv_rgb_bridge->image.clone();
-    vector<Detection> detections = door_detector_->detectObjectYOLO(image);
+    vector<ORB_SLAM3::Detection> detections = door_detector_->detectObjectYOLO(image);
     //vector<OCRDetection> text_detections = ocr_->detect_rec(image);
-    vector<Detection> doors;
+    vector<ORB_SLAM3::Detection> doors;
     
     for(auto& m : detections){
         //m.sensor_pose_ = sensor_pose;
         //==========Testing Room Number=========
         if(m.getClassName() == "room_number"){
             cv::Rect roi = m.getRoI();
-            OCRDetection text_out;
+            ORB_SLAM3::OCRDetection text_out;
             bool found_txt = ocr_->textRecognition(image, roi, text_out);
             if(found_txt){
                 m.copyContent(text_out);
@@ -191,7 +191,7 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
             depth_mat.convertTo(depth_scaled,CV_32F, 1.0/depth_factor_);
         }
 
-        DetectionGroup dg(color_mat, depth_scaled, sensor_pose, doors, K_side_, color_image->header.stamp.toSec());
+        ORB_SLAM3::DetectionGroup dg(color_mat, depth_scaled, sensor_pose, doors, K, color_image->header.stamp.toSec());
         object_lock_.lock();
         obj_detection_buf_.push(dg);
         object_lock_.unlock();
@@ -307,7 +307,7 @@ void SemanticSLAM::keyframeCallback(){
         }
         pub_path_.publish(path);
 
-        unordered_map<int, vector<Object*>> h_graph;
+        unordered_map<int, vector<ORB_SLAM3::Object*>> h_graph;
         visual_odom_->getHierarchyGraph(h_graph);
         pcl::PointCloud<pcl::PointXYZRGB> obj_cloud;
         for(const auto& fo_pair : h_graph){

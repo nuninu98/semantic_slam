@@ -193,8 +193,9 @@ target_link_libraries(semantic_slam_algorithm
   ${catkin_LIBRARIES}
   ${PCL_LIBRARIES}
   ${EIGEN3_LIBS}
+  ${Pangolin_LIBRARIES}
   ${ORB_SLAM3_DIR}/lib/libORB_SLAM3.so
-  ${ORB_SLAM3_DIR}/lib/libORB_SLAM3_DATA_TYPE.so
+  #${ORB_SLAM3_DIR}/lib/libORB_SLAM3_DATA_TYPE.so
   #semantic_slam_dtype
   gtsam
 )
