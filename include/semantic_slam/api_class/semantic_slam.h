@@ -55,17 +55,23 @@ class SemanticSLAM{
         shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> tracking_depth_;
         shared_ptr< message_filters::Synchronizer<sync_pol>> tracking_sync_;
 
-        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> detection_color_;
-        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> detection_depth_;
-        shared_ptr< message_filters::Synchronizer<sync_pol>> detection_sync_;
+        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> side_color_;
+        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> side_depth_;
+        shared_ptr< message_filters::Synchronizer<sync_pol>> side_sync_;
 
+        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> front_color_;
+        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> front_depth_;
+        shared_ptr< message_filters::Synchronizer<sync_pol>> front_sync_;
+        //============Test yolov8 seg=============
+        ros::Subscriber sub_frontcam_;
+
+        void frontCamCallback(const sensor_msgs::ImageConstPtr& color_img);
+        //========================================
         vector<cv::Scalar> colors_;
         shared_ptr<LandmarkDetector> door_detector_;
         shared_ptr<LandmarkDetector> obj_detector_;
         vector<string> class_names_;
 
-        //ros::Subscriber sub_sidecam_detection_;
-        //ros::Subscriber sub_frontcam_detection_;
 
         ros::Subscriber sub_imu_;
 
@@ -77,6 +83,7 @@ class SemanticSLAM{
 
         mutex object_lock_;
         Eigen::Matrix3f K_side_;
+        Eigen::Matrix3f K_front_;
         //queue<pair<ros::Time, vector<Detection>>> obj_detection_buf_;
         queue<ORB_SLAM3::DetectionGroup> obj_detection_buf_;
         void trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image);
@@ -102,7 +109,14 @@ class SemanticSLAM{
         ros::Publisher pub_path_;
 
         ros::Publisher pub_object_cloud_;
-        ros::Publisher pub_object_label_;
+        ros::Publisher pub_h_graph_;
+        ros::Publisher pub_map_cloud_;
+        
+        void visualizeHGraph(const unordered_map<int, vector<ORB_SLAM3::Object*>>& h_graph, visualization_msgs::MarkerArray& output);
+        
+        //=========Test Floor Plane===========
+        ORB_SLAM3::KeyFrame* normalPlaneRansac(const vector<ORB_SLAM3::KeyFrame*>& xyz_norms);
+        ros::Publisher pub_floor_;
         //====================================
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW

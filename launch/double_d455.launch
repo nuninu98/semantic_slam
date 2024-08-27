@@ -1,6 +1,6 @@
 <launch>
     <param name="use_sim_time" value="true"/>
-    <arg name="setting_file" default="$(find semantic_slam)/setting/d435.yaml"/>
+    <arg name="setting_file" default="$(find semantic_slam)/setting/double_d455.yaml"/>
     <node name="test_semantic_slam" pkg="semantic_slam" type="test_semantic_slam" output="screen" launch-prefix="xterm -e gdb --args">
         <param name="vocabulary_file" value="$(find semantic_slam)/model/ORBvoc.txt"/>
         <param name="setting_file" value="$(arg setting_file)"/>
@@ -10,15 +10,13 @@
         <param name="obj_detection_onnx" value="$(find semantic_slam)/model/yolov8m-seg.onnx"/>
         <param name="obj_detection_classes" value="$(find semantic_slam)/model/yolov8m_seg.txt"/>
         
-        <param name="rgb_topic" value="/d455/color/image_raw"/>
-        <param name="depth_topic" value="/d455/aligned_depth_to_color/image_raw"/>
+        <param name="rgb_topic" value="/front/color/image_raw"/>
+        <param name="depth_topic" value="/front/aligned_depth_to_color/image_raw"/>
 
-        <param name="imu_topic" value="/d455/imu"/>
+        <param name="imu_topic" value="/front/imu"/>
     
         <param name="crnn_file" value="/home/nuninu98/Downloads/crnn_cs.onnx"/>
         <param name="text_list" value="/home/nuninu98/Downloads/alphabet_94.txt"/>  
     </node>
     <!-- <node name="rviz_slam" pkg="rviz" type="rviz" args="-d $(find orb_semantic_slam)/rviz/config.rviz" launch-prefix="xterm -e gdb args"/> -->
 </launch>
-
-<!-- launch-prefix="xterm -e gdb __args"-->
