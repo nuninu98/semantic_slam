@@ -106,16 +106,15 @@ class SemanticSLAM{
         condition_variable keyframe_cv_;
 
         tf2_ros::TransformBroadcaster broadcaster_;
-        ros::Publisher pub_path_;
-
+        //ros::Publisher pub_path_;
+        vector<ros::Publisher> pub_floor_path_;
         ros::Publisher pub_object_cloud_;
         ros::Publisher pub_h_graph_;
         ros::Publisher pub_map_cloud_;
         
-        void visualizeHGraph(const unordered_map<int, vector<ORB_SLAM3::Object*>>& h_graph, visualization_msgs::MarkerArray& output);
+        void visualizeHGraph(const ORB_SLAM3::HGraph& h_graph, visualization_msgs::MarkerArray& output);
         
         //=========Test Floor Plane===========
-        ORB_SLAM3::KeyFrame* normalPlaneRansac(const vector<ORB_SLAM3::KeyFrame*>& xyz_norms);
         ros::Publisher pub_floor_;
         //====================================
     public:

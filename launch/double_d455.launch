@@ -13,7 +13,7 @@
         <param name="rgb_topic" value="/front/color/image_raw"/>
         <param name="depth_topic" value="/front/aligned_depth_to_color/image_raw"/>
 
-        <param name="imu_topic" value="/front/imu"/>
+        <param name="imu_topic" value="/side/imu"/>
     
         <param name="crnn_file" value="/home/nuninu98/Downloads/crnn_cs.onnx"/>
         <param name="text_list" value="/home/nuninu98/Downloads/alphabet_94.txt"/>  
