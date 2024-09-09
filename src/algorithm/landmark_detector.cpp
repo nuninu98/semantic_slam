@@ -20,8 +20,8 @@ cv::Mat LandmarkDetector::formatToSquare(const cv::Mat& source){
     return result;
 }
 
-vector<ORB_SLAM3::Detection> LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image){
-    vector<ORB_SLAM3::Detection> objects;
+vector<Detection> LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image){
+    vector<Detection> objects;
     cv::Mat model_input = rgb_image;
 
     model_input = formatToSquare(model_input);
@@ -88,7 +88,7 @@ vector<ORB_SLAM3::Detection> LandmarkDetector::detectObjectYOLO(const cv::Mat& r
     cv::dnn::NMSBoxes(boxes, confidences, CONFIDENCE_THRESHOLD, NMS_TRESHOLD, nms_result);
     for(int i = 0; i < nms_result.size(); ++i){
         int idx = nms_result[i];
-        ORB_SLAM3::Detection detection(boxes[idx], cv::Mat(), class_names_[class_ids[idx]]);
+        Detection detection(boxes[idx], cv::Mat(), class_names_[class_ids[idx]]);
         objects.push_back(detection);
     }
   

@@ -177,13 +177,16 @@ include_directories(
   ${GTSAM_INCLUDE_DIR}
 )
 
-# add_library(semantic_slam_dtype
-#   src/data_types/data_types.cpp
-# )
-# target_link_libraries(semantic_slam_dtype
-#   ${OpenCV_LIBS} 
-#   ${EIGEN3_LIBS}
-# )
+add_library(semantic_slam_dtype
+  src/data_type/DataType.cpp
+  src/data_type/HGraph.cpp
+  src/data_type/KeyFrame.cpp
+)
+target_link_libraries(semantic_slam_dtype
+  ${OpenCV_LIBS} 
+  ${EIGEN3_LIBS}
+  ${PCL_LIBRARIES}
+)
 
 add_library(semantic_slam_algorithm
   src/algorithm/landmark_detector.cpp
@@ -196,7 +199,7 @@ target_link_libraries(semantic_slam_algorithm
   ${Pangolin_LIBRARIES}
   ${ORB_SLAM3_DIR}/lib/libORB_SLAM3.so
   #${ORB_SLAM3_DIR}/lib/libORB_SLAM3_DATA_TYPE.so
-  #semantic_slam_dtype
+  semantic_slam_dtype
   gtsam
 )
 

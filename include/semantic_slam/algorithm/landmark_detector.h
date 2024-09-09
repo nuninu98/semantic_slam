@@ -12,7 +12,7 @@
 #include <Eigen/Dense>
 #include <Eigen/SVD>
 #include <fstream>
-#include <DataType.h>
+#include <semantic_slam/data_type/DataType.h>
 #include <opencv2/cudaimgproc.hpp>
 using namespace std;
 
@@ -35,7 +35,7 @@ class LandmarkDetector{
 
         ~LandmarkDetector();
         
-        vector<ORB_SLAM3::Detection> detectObjectYOLO(const cv::Mat& rgb_image);
+        vector<Detection> detectObjectYOLO(const cv::Mat& rgb_image);
 
 
         vector<string> getClassNames() const;

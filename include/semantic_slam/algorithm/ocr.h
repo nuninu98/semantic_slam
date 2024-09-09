@@ -7,7 +7,7 @@
 #include <fstream>
 #include <omp.h>
 #include <opencv2/ximgproc.hpp>
-#include "DataType.h"
+#include <semantic_slam/data_type/DataType.h>
 using namespace std;
 
 class OCR
@@ -35,9 +35,9 @@ class OCR
 		//Net recognizer;
         OCR(string modelRecognition, string alphabet);
 		
-        vector<ORB_SLAM3::OCRDetection> detect_rec(cv::Mat& frame);
+        vector<OCRDetection> detect_rec(cv::Mat& frame);
 
-		bool textRecognition(cv::Mat& frame, cv::Rect& roi, ORB_SLAM3::OCRDetection& output);
+		bool textRecognition(cv::Mat& frame, cv::Rect& roi, OCRDetection& output);
 };
 
 #endif

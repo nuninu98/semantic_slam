@@ -40,6 +40,8 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <pcl/conversions.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <semantic_slam/data_type/KeyFrame.h>
+#include <semantic_slam/data_type/HGraph.h>
 using namespace std;
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
@@ -85,7 +87,7 @@ class SemanticSLAM{
         Eigen::Matrix3f K_side_;
         Eigen::Matrix3f K_front_;
         //queue<pair<ros::Time, vector<Detection>>> obj_detection_buf_;
-        queue<ORB_SLAM3::DetectionGroup> obj_detection_buf_;
+        queue<DetectionGroup> obj_detection_buf_;
         void trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image);
         
         void imuCallback(const sensor_msgs::ImuConstPtr& imu);
@@ -99,11 +101,7 @@ class SemanticSLAM{
         bool kill_flag_;
         bool thread_killed_;
         
-        thread keyframe_thread_;
-        mutex keyframe_lock_;
-        void keyframeCallback();
-        bool keyframe_updated_;
-        condition_variable keyframe_cv_;
+       
 
         tf2_ros::TransformBroadcaster broadcaster_;
         //ros::Publisher pub_path_;
@@ -112,11 +110,23 @@ class SemanticSLAM{
         ros::Publisher pub_h_graph_;
         ros::Publisher pub_map_cloud_;
         
-        void visualizeHGraph(const ORB_SLAM3::HGraph& h_graph, visualization_msgs::MarkerArray& output);
+        void visualizeHGraph(const HGraph& h_graph, visualization_msgs::MarkerArray& output);
         
         //=========Test Floor Plane===========
         ros::Publisher pub_floor_;
         //====================================
+
+        //=============Test new struct========
+        condition_variable keyframe_cv_;
+        bool kf_updated_;
+        unordered_map<size_t, KeyFrame*> kfs_;
+        Floor* floor_;
+        thread keyframe_thread_;
+        mutex keyframe_lock_;
+        void keyframeCallback();
+        HGraph h_graph_;
+
+        
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         SemanticSLAM();

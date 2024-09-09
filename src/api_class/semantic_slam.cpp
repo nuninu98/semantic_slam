@@ -1,5 +1,5 @@
 #include <semantic_slam/api_class/semantic_slam.h>
-SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false), keyframe_updated_(false), depth_factor_(1000.0){
+SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false), depth_factor_(1000.0), floor_(nullptr), kf_updated_(false){
 
     string voc_file;
     pnh_.param<string>("vocabulary_file", voc_file, "/home/nuninu98/catkin_ws/src/orb_semantic_slam/model/ORBvoc.txt");
@@ -62,7 +62,7 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     
 
     visual_odom_ = new ORB_SLAM3::System(voc_file, setting_file ,ORB_SLAM3::System::RGBD, false);
-    visual_odom_->registerKeyframeCall(&keyframe_updated_, &keyframe_cv_);
+    visual_odom_->registerKeyframeCall(&kf_updated_, &keyframe_cv_);
     keyframe_thread_ = thread(&SemanticSLAM::keyframeCallback, this);
     keyframe_thread_.detach();
     
@@ -119,23 +119,8 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
     }
     imu_lock_.unlock();
 
-    vector<ORB_SLAM3::DetectionGroup> detection_groups;
-    object_lock_.lock();
-    while(!obj_detection_buf_.empty()){
-        double obj_stamp = obj_detection_buf_.front().stamp();
-        if(obj_stamp > stamp.toSec()){
-            break;
-        }
-        if(stamp.toSec() - obj_stamp < 0.1){
-            detection_groups.push_back(obj_detection_buf_.front());
-        }
-        obj_detection_buf_.pop();
-    }
-    object_lock_.unlock();
     keyframe_lock_.lock();
-    ros::Time tic = ros::Time::now();
-    Eigen::Matrix4f cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), detection_groups, imu_points).matrix();
-    //cout<<(ros::Time::now() - tic).toSec()*1000.0<<"ms"<<endl;
+    Eigen::Matrix4f cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), imu_points).matrix();
     keyframe_lock_.unlock();
     Eigen::Matrix4f optic_in_map = cam_extrinsic.inverse();
     Eigen::Matrix4f base_in_map = optic_in_map * OPTIC_TF.inverse();
@@ -178,16 +163,16 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
     cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(color_image, "bgr8");
     cv_bridge::CvImageConstPtr cv_depth_bridge = cv_bridge::toCvShare(depth_image, depth_image->encoding);
     cv::Mat image = cv_rgb_bridge->image.clone();
-    vector<ORB_SLAM3::Detection> detections = door_detector_->detectObjectYOLO(image);
+    vector<Detection> detections = door_detector_->detectObjectYOLO(image);
     //vector<OCRDetection> text_detections = ocr_->detect_rec(image);
-    vector<ORB_SLAM3::Detection> doors;
+    vector<Detection> doors;
     
     for(auto& m : detections){
         //m.sensor_pose_ = sensor_pose;
         //==========Testing Room Number=========
         if(m.getClassName() == "room_number"){
             cv::Rect roi = m.getRoI();
-            ORB_SLAM3::OCRDetection text_out;
+            OCRDetection text_out;
             bool found_txt = ocr_->textRecognition(image, roi, text_out);
             if(found_txt){
                 m.copyContent(text_out);
@@ -221,7 +206,7 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
             depth_mat.convertTo(depth_scaled,CV_32F, 1.0/depth_factor_);
         }
 
-        ORB_SLAM3::DetectionGroup dg(color_mat, depth_scaled, sensor_pose, doors, K, color_image->header.stamp.toSec());
+        DetectionGroup dg(color_mat, depth_scaled, sensor_pose, doors, K, color_image->header.stamp.toSec());
         object_lock_.lock();
         obj_detection_buf_.push(dg);
         object_lock_.unlock();
@@ -269,83 +254,122 @@ SemanticSLAM::~SemanticSLAM(){
 void SemanticSLAM::keyframeCallback(){
     while(true){
         unique_lock<mutex> key_lock(keyframe_lock_);
-        keyframe_cv_.wait(key_lock, [this]{return this->keyframe_updated_ || this->kill_flag_;});
+        keyframe_cv_.wait(key_lock, [this]{return this->kf_updated_ || this->kill_flag_;});
         if(kill_flag_){
             thread_killed_ = true;
             break;
         }
-        const ORB_SLAM3::HGraph* h_graph = visual_odom_->getHierarchyGraph();
-        vector<ORB_SLAM3::KeyFrame*> keys = visual_odom_->getKeyframes();
-        keyframe_updated_ = false;
-        pcl::PointCloud<pcl::PointXYZRGB> map_cloud;
-        visual_odom_->getMapPointCloud(map_cloud);
-        key_lock.unlock();
-
-        sort(keys.begin(), keys.end(), [](ORB_SLAM3::KeyFrame* k1, ORB_SLAM3::KeyFrame* k2){
-            return k1->mnId < k2->mnId;
-        });
-        vector<ORB_SLAM3::Floor*> floors = h_graph->floors();
-        vector<nav_msgs::Path> paths_floor;
-        for(int i = 0; i < pub_floor_path_.size(); ++i){
-            nav_msgs::Path path;
-            path.header.frame_id = "map_optic";
-            path.header.stamp = ros::Time::now();
-            paths_floor.push_back(path);
+        auto orb_kf = visual_odom_->getLastKF();
+        double stamp = orb_kf->mTimeStamp;
+        vector<DetectionGroup> detection_groups;
+        object_lock_.lock();
+        while(!obj_detection_buf_.empty()){
+            double obj_stamp = obj_detection_buf_.front().stamp();
+            if(obj_stamp > stamp){
+                break;
+            }
+            if(stamp - obj_stamp < 0.1){
+                detection_groups.push_back(obj_detection_buf_.front());
+            }
+            obj_detection_buf_.pop();
         }
-        
-        for(int i = 0; i < keys.size(); ++i){
-            auto k = keys[i];
-            Eigen::Matrix4f pose = k->GetPose().matrix().inverse() * OPTIC_TF.inverse();
-            geometry_msgs::PoseStamped p;
-            p.pose.position.x = pose(0, 3);
-            p.pose.position.y = pose(1, 3);
-            p.pose.position.z = pose(2, 3);
-            for(int fl = 0; fl < floors.size(); ++fl){
-                if(floors[fl] == k->getFloor()){
-                    paths_floor[fl].poses.push_back(p);
-                    break;
+        object_lock_.unlock();
+        cout<<"KF_IN: "<<orb_kf->mnId<<endl;
+        if(kfs_.find(orb_kf->mnId) == kfs_.end()){
+            KeyFrame* new_kf = new KeyFrame(orb_kf->mnId, orb_kf->GetPoseInverse().matrix());
+            kfs_.insert(make_pair(new_kf->id(), new_kf));
+            new_kf->setDetection(detection_groups);
+            if(floor_ == nullptr){
+                floor_ = new Floor(0, new_kf);
+                cout<<"Generate Floor"<<endl;
+                new_kf->setFloor(floor_);
+                h_graph_.insert(floor_);
+            }
+            else{
+                floor_->refine();
+                if(floor_->isInlier(new_kf)){
+                    new_kf->setFloor(floor_);
+                }
+                else{
+                    floor_ = nullptr;
                 }
             }
-            //cout<<p.pose.position.x<<" "<<p.pose.position.y<<" "<<p.pose.position.z<<endl;
-            //path.poses.push_back(p);
         }
+        kf_updated_ = false;    
+        key_lock.unlock();
 
-        for(int i = 0; i < pub_floor_path_.size(); ++i){
-            pub_floor_path_[i].publish(paths_floor[i]);
-        }
+        // const HGraph* h_graph = visual_odom_->getHierarchyGraph();
+        // vector<KeyFrame*> keys = visual_odom_->getKeyframes();
+        // keyframe_updated_ = false;
+        // pcl::PointCloud<pcl::PointXYZRGB> map_cloud;
+        // visual_odom_->getMapPointCloud(map_cloud);
+        // key_lock.unlock();
+
+        // sort(keys.begin(), keys.end(), [](KeyFrame* k1, KeyFrame* k2){
+        //     return k1->id() < k2->id();
+        // });
+        // vector<Floor*> floors = h_graph->floors();
+        // vector<nav_msgs::Path> paths_floor;
+        // for(int i = 0; i < pub_floor_path_.size(); ++i){
+        //     nav_msgs::Path path;
+        //     path.header.frame_id = "map_optic";
+        //     path.header.stamp = ros::Time::now();
+        //     paths_floor.push_back(path);
+        // }
+        
+        // for(int i = 0; i < keys.size(); ++i){
+        //     auto k = keys[i];
+        //     Eigen::Matrix4f pose = k->getPose() * OPTIC_TF.inverse();
+        //     geometry_msgs::PoseStamped p;
+        //     p.pose.position.x = pose(0, 3);
+        //     p.pose.position.y = pose(1, 3);
+        //     p.pose.position.z = pose(2, 3);
+        //     for(int fl = 0; fl < floors.size(); ++fl){
+        //         if(floors[fl] == k->getFloor()){
+        //             paths_floor[fl].poses.push_back(p);
+        //             break;
+        //         }
+        //     }
+        //     //cout<<p.pose.position.x<<" "<<p.pose.position.y<<" "<<p.pose.position.z<<endl;
+        //     //path.poses.push_back(p);
+        // }
+
+        // for(int i = 0; i < pub_floor_path_.size(); ++i){
+        //     pub_floor_path_[i].publish(paths_floor[i]);
+        // }
         
 
 
         
-        pcl::PointCloud<pcl::PointXYZRGB> obj_cloud;
+        // pcl::PointCloud<pcl::PointXYZRGB> obj_cloud;
 
-        for(const auto& obj : h_graph->getEveryObjects()){
-            pcl::PointCloud<pcl::PointXYZRGB> ocl;
-            obj->getCloud(ocl);
-            obj_cloud += ocl;
-        }
+        // for(const auto& obj : h_graph->getEveryObjects()){
+        //     pcl::PointCloud<pcl::PointXYZRGB> ocl;
+        //     obj->getCloud(ocl);
+        //     obj_cloud += ocl;
+        // }
         
         
 
-        sensor_msgs::PointCloud2 obj_cloud_ros;
-        pcl::toROSMsg(obj_cloud, obj_cloud_ros);
-        obj_cloud_ros.header.frame_id = "map_optic";
-        obj_cloud_ros.header.stamp = ros::Time::now();
-        pub_object_cloud_.publish(obj_cloud_ros);
+        // sensor_msgs::PointCloud2 obj_cloud_ros;
+        // pcl::toROSMsg(obj_cloud, obj_cloud_ros);
+        // obj_cloud_ros.header.frame_id = "map_optic";
+        // obj_cloud_ros.header.stamp = ros::Time::now();
+        // pub_object_cloud_.publish(obj_cloud_ros);
 
-        // sensor_msgs::PointCloud2 map_cloud_ros;
-        // pcl::toROSMsg(map_cloud, map_cloud_ros);
-        // map_cloud_ros.header.stamp = ros::Time::now();
-        // map_cloud_ros.header.frame_id = "map_optic";
-        // pub_map_cloud_.publish(map_cloud_ros);
+        // // sensor_msgs::PointCloud2 map_cloud_ros;
+        // // pcl::toROSMsg(map_cloud, map_cloud_ros);
+        // // map_cloud_ros.header.stamp = ros::Time::now();
+        // // map_cloud_ros.header.frame_id = "map_optic";
+        // // pub_map_cloud_.publish(map_cloud_ros);
 
-        // visualization_msgs::MarkerArray h_graph_vis;
-        // visualizeHGraph(h_graph, h_graph_vis);
-        // pub_h_graph_.publish(h_graph_vis);     
+        // // visualization_msgs::MarkerArray h_graph_vis;
+        // // visualizeHGraph(h_graph, h_graph_vis);
+        // // pub_h_graph_.publish(h_graph_vis);     
     }
 }
 
-void SemanticSLAM::visualizeHGraph(const ORB_SLAM3::HGraph& h_graph, visualization_msgs::MarkerArray& output){
+void SemanticSLAM::visualizeHGraph(const HGraph& h_graph, visualization_msgs::MarkerArray& output){
     // output.markers.clear();
     // unordered_set<const ORB_SLAM3::KeyFrame*> keys;
     // size_t id = 0;
