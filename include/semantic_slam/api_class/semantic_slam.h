@@ -2,7 +2,6 @@
 #define __SEMANTIC_SLAM_HEADER_H__
 #include <ros/ros.h>
 //#include <include/System.h>
-#include "System.h"
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <unordered_set>
@@ -42,10 +41,25 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <semantic_slam/data_type/KeyFrame.h>
 #include <semantic_slam/data_type/HGraph.h>
+
+#include <gtsam/geometry/Rot3.h>
+#include <gtsam/geometry/Point3.h>
+#include <gtsam/geometry/Pose3.h>
+#include <gtsam/slam/PriorFactor.h>
+#include <gtsam/slam/BetweenFactor.h>
+#include <gtsam/nonlinear/NonlinearFactorGraph.h>
+#include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
+#include <gtsam/nonlinear/Values.h>
+#include <gtsam/nonlinear/ISAM2.h>
+#include <gtsam/geometry/PinholeCamera.h>
+#include <gtsam/inference/Symbol.h>
+
+#include "System.h"
+#include "LoopQuery.h"
 using namespace std;
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
-
+using namespace gtsam::symbol_shorthand;
 class SemanticSLAM{
     private:
         Eigen::Matrix4f OPTIC_TF = (Eigen::Matrix4f()<< 0, 0, 1, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 1).finished();
@@ -97,6 +111,10 @@ class SemanticSLAM{
         Eigen::Matrix4f sidecam_in_frontcam_; // optic
         double depth_factor_;
 
+        void addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs = vector<DetectionGroup>());
+        
+        void publishPath();
+
         //============Visualization===========
         bool kill_flag_;
         bool thread_killed_;
@@ -119,14 +137,22 @@ class SemanticSLAM{
         //=============Test new struct========
         condition_variable keyframe_cv_;
         bool kf_updated_;
+        queue<ORB_SLAM3::LoopQuery> lc_buf_;
+        KeyFrame* last_key_;
         unordered_map<size_t, KeyFrame*> kfs_;
         Floor* floor_;
-        thread keyframe_thread_;
+        thread keyframe_thread_, loop_thread_;
         mutex keyframe_lock_;
         void keyframeCallback();
+        void loopQueryCallback();
         HGraph h_graph_;
 
+        //Eigen::Matrix4f pose_offset_;
+
+        gtsam::NonlinearFactorGraph gtsam_factors_;
+        gtsam::ISAM2 isam_;
         
+
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         SemanticSLAM();

@@ -13,9 +13,12 @@ class KeyFrame{
         Floor* floor_;
         size_t id_;
         Eigen::Matrix4f pose_;
+        Eigen::Matrix4f odom_pose_;
         vector<DetectionGroup> detections_;
     public:
         Eigen::Matrix4f getPose() const;
+
+        Eigen::Matrix4f getOdomPose() const;
         KeyFrame(size_t id, const Eigen::Matrix4f& pose);
 
         KeyFrame(const KeyFrame& k);
@@ -29,6 +32,8 @@ class KeyFrame{
 
         void getDetection(vector<const DetectionGroup*>& output) const;
 
+        void setPose(const Eigen::Matrix4f& pose);
+        
         size_t id() const;
 };
 

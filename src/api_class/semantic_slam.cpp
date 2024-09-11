@@ -1,5 +1,6 @@
 #include <semantic_slam/api_class/semantic_slam.h>
-SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false), depth_factor_(1000.0), floor_(nullptr), kf_updated_(false){
+SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false), depth_factor_(1000.0), floor_(nullptr), kf_updated_(false), last_key_(nullptr)
+{
 
     string voc_file;
     pnh_.param<string>("vocabulary_file", voc_file, "/home/nuninu98/catkin_ws/src/orb_semantic_slam/model/ORBvoc.txt");
@@ -62,9 +63,12 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     
 
     visual_odom_ = new ORB_SLAM3::System(voc_file, setting_file ,ORB_SLAM3::System::RGBD, false);
-    visual_odom_->registerKeyframeCall(&kf_updated_, &keyframe_cv_);
+    visual_odom_->registerKeyframeCall(&kf_updated_, &keyframe_cv_, &lc_buf_);
     keyframe_thread_ = thread(&SemanticSLAM::keyframeCallback, this);
     keyframe_thread_.detach();
+
+    loop_thread_ = thread(&SemanticSLAM::loopQueryCallback, this);
+    loop_thread_.detach();
     
    
     string rgb_topic, depth_topic, imu_topic;
@@ -120,9 +124,16 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
     imu_lock_.unlock();
 
     keyframe_lock_.lock();
-    Eigen::Matrix4f cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), imu_points).matrix();
+    Eigen::Matrix4f vo_pose = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), imu_points).matrix().inverse();
+    Eigen::Matrix4f act_pose = Eigen::Matrix4f::Identity();
+    if(last_key_ == nullptr){
+        act_pose = vo_pose;
+    }
+    else{
+        act_pose = last_key_->getPose() * (last_key_->getOdomPose().inverse() * vo_pose);
+    }
     keyframe_lock_.unlock();
-    Eigen::Matrix4f optic_in_map = cam_extrinsic.inverse();
+    Eigen::Matrix4f optic_in_map = act_pose;
     Eigen::Matrix4f base_in_map = optic_in_map * OPTIC_TF.inverse();
 
     vector<geometry_msgs::TransformStamped> tfs;
@@ -155,8 +166,7 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
     tfs.push_back(tf_offset);
 
     broadcaster_.sendTransform(tfs);
-    //Eigen::Matrix4d cam_extrinsic = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec(), imu_points).matrix().cast<double>();
-    //cout<<"dt: "<<(ros::Time::now() - tic).toSec()<<endl;
+
 }
 
 void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, const Eigen::Matrix4f& sensor_pose, const Eigen::Matrix3f& K){
@@ -251,6 +261,158 @@ SemanticSLAM::~SemanticSLAM(){
     visual_odom_->Shutdown();
 }
 
+void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
+    kf->setDetection(dgs);
+    if(floor_ == nullptr){
+        floor_ = new Floor(0, kf);
+        cout<<"Generate Floor"<<endl;
+        kf->setFloor(floor_);
+        h_graph_.insert(floor_);
+    }
+    else{
+        floor_->refine();
+        if(floor_->isInlier(kf)){
+            kf->setFloor(floor_);
+            floor_->addKeyFrame(kf);
+        }
+        else{
+            floor_ = nullptr;
+        }
+    }
+    vector<const DetectionGroup*> kf_dets;
+    kf->getDetection(kf_dets);
+    for(const auto& dg : kf_dets){
+        Eigen::Matrix3f K = dg->getIntrinsic();
+        vector<const Detection*> detections;
+        dg->detections(detections);
+        Eigen::Matrix4f cam_in_map = kf->getPose()* dg->getSensorPose();
+
+        for(auto& det : detections){
+            cv::Rect box_est;
+            float max_score = 1.0;
+            int idx = -1;
+            vector<Object*> tgt_objs = h_graph_.getObjects(kf->getFloor(), det->getClassName());
+            for(int i = 0; i < tgt_objs.size(); ++i){   
+                //if(det->getClassName() == tgt_objs[i]->getClassName()){
+                    Eigen::Vector3f obj_centroid = tgt_objs[i]->getCentroid();
+                    //=============IOU Method================
+                    // tgt_objs[i]->getEstBbox(K, cam_in_map, box_est);
+                    // cv::Rect common = box_est & det->getRoI();
+                    // double iou = ((double)common.area())/(double)(det->getRoI().area() + box_est.area() - common.area());
+                    // if(iou > max_score){
+                    //     max_score = iou;
+                    //     idx = i;
+                    // }
+                    //=======================================
+
+                    //=============Euclidean Dist Method=====
+                    pcl::PointCloud<pcl::PointXYZRGB> cloud;
+                    det->getCloud(cloud);
+                    pcl::PointCloud<pcl::PointXYZRGB> cloud_tf;
+                    pcl::transformPointCloud(cloud, cloud_tf, cam_in_map);
+                    pcl::PointXYZRGB det_centroid;
+                    pcl::computeCentroid(cloud_tf, det_centroid);
+
+                    float dist = sqrt(pow(det_centroid.x- obj_centroid(0), 2) + pow(det_centroid.y- obj_centroid(1), 2) + pow(det_centroid.z- obj_centroid(2), 2));
+                    float score = 1.0 / dist;
+                    if(score > max_score){
+                        max_score = score;
+                        idx = i;
+                    }
+                    //=======================================
+                //}
+            }
+
+            if(idx != -1){ // matched
+                cout<<"MATCH"<<endl;
+                pcl::PointCloud<pcl::PointXYZRGB> cloud;
+                det->getCloud(cloud);
+                Object* best_obj = tgt_objs[idx];
+                best_obj->addDetection(det);
+            }
+            else{ //initialize
+                
+                pcl::PointCloud<pcl::PointXYZRGB> cloud;
+                det->getCloud(cloud);
+                if(!cloud.empty()){
+                    cout<<"INIT"<<endl;
+                    pcl::PointCloud<pcl::PointXYZRGB> cloud_tf;
+                    pcl::transformPointCloud(cloud, cloud_tf, cam_in_map);
+                    Object* new_obj = new Object(det->getClassName());
+                    new_obj->addDetection(det);
+                    h_graph_.insert(kf->getFloor(), new_obj);
+                }
+            
+            }
+            //cout<<"===="<<endl;
+            
+        }
+    }
+
+    gtsam::Values new_vals;
+    
+    //gtsam::NonlinearFactorGraph new_conns;
+    if(last_key_ == nullptr){    
+        new_vals.insert(X(kf->id()), gtsam::Pose3(kf->getPose().cast<double>()));
+        auto init_pose_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-5, 1e-5, 1e-5, 1e-4, 1e-4, 1e-4).finished());
+        gtsam::PriorFactor<gtsam::Pose3> init(X(kf->id()), gtsam::Pose3(kf->getPose().cast<double>()), init_pose_noise);
+        gtsam_factors_.add(init);
+        //new_conns.add(init);
+        
+    }
+    else{
+        
+        auto pose_diff_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-2, 1e-2, 1e-2, 1e-1, 1e-1, 1e-1).finished());
+        Eigen::Matrix4f odom_meas = last_key_->getOdomPose().inverse() * kf->getOdomPose();
+        gtsam::BetweenFactor<gtsam::Pose3> bf(X(last_key_->id()), X(kf->id()),  gtsam::Pose3(odom_meas.cast<double>()), pose_diff_noise);
+        kf->setPose(last_key_->getPose() * odom_meas);
+        new_vals.insert(X(kf->id()), gtsam::Pose3(kf->getPose().cast<double>()));
+        gtsam_factors_.add(bf);
+        //new_conns.add(gtsam::BetweenFactor<gtsam::Pose3>(X(last_key_->id()), X(kf->id()),  p1.inverse()*p2, pose_diff_noise));
+    }
+    isam_.update(gtsam_factors_, new_vals);
+    kfs_.insert(make_pair(kf->id(), kf));
+    gtsam_factors_.resize(0);
+
+    last_key_ = kf;
+}
+
+void SemanticSLAM::publishPath(){
+    if(last_key_ == nullptr){
+        return;
+    }
+    vector<nav_msgs::Path> paths_floor;
+    for(int i = 0; i < pub_floor_path_.size(); ++i){
+        nav_msgs::Path path;
+        path.header.frame_id = "map_optic";
+        path.header.stamp = ros::Time::now();
+        paths_floor.push_back(path);
+    }
+
+    for(size_t i = 1; i < last_key_->id(); ++i){
+        if(kfs_.find(i) == kfs_.end()){
+            continue;
+        }
+        auto k = kfs_[i];
+        Eigen::Matrix4f pose = k->getPose() * OPTIC_TF.inverse();
+        geometry_msgs::PoseStamped p;
+        p.pose.position.x = pose(0, 3);
+        p.pose.position.y = pose(1, 3);
+        p.pose.position.z = pose(2, 3);
+        vector<Floor*> floors = h_graph_.floors();
+        for(int fl = 0; fl < floors.size(); ++fl){
+            if(floors[fl] == k->getFloor()){
+                paths_floor[fl].poses.push_back(p);
+                break;
+            }
+        }
+    }
+
+    for(int i = 0; i < pub_floor_path_.size(); ++i){
+        pub_floor_path_[i].publish(paths_floor[i]);
+    }
+}
+
 void SemanticSLAM::keyframeCallback(){
     while(true){
         unique_lock<mutex> key_lock(keyframe_lock_);
@@ -274,88 +436,24 @@ void SemanticSLAM::keyframeCallback(){
             obj_detection_buf_.pop();
         }
         object_lock_.unlock();
-        cout<<"KF_IN: "<<orb_kf->mnId<<endl;
-        if(kfs_.find(orb_kf->mnId) == kfs_.end()){
-            KeyFrame* new_kf = new KeyFrame(orb_kf->mnId, orb_kf->GetPoseInverse().matrix());
-            kfs_.insert(make_pair(new_kf->id(), new_kf));
-            new_kf->setDetection(detection_groups);
-            if(floor_ == nullptr){
-                floor_ = new Floor(0, new_kf);
-                cout<<"Generate Floor"<<endl;
-                new_kf->setFloor(floor_);
-                h_graph_.insert(floor_);
-            }
-            else{
-                floor_->refine();
-                if(floor_->isInlier(new_kf)){
-                    new_kf->setFloor(floor_);
-                }
-                else{
-                    floor_ = nullptr;
-                }
-            }
-        }
+        KeyFrame* new_kf = new KeyFrame(orb_kf->mnId, orb_kf->GetPoseInverse().matrix());
+        addKeyFrame(new_kf, detection_groups);
         kf_updated_ = false;    
         key_lock.unlock();
-
-        // const HGraph* h_graph = visual_odom_->getHierarchyGraph();
-        // vector<KeyFrame*> keys = visual_odom_->getKeyframes();
-        // keyframe_updated_ = false;
-        // pcl::PointCloud<pcl::PointXYZRGB> map_cloud;
-        // visual_odom_->getMapPointCloud(map_cloud);
-        // key_lock.unlock();
-
-        // sort(keys.begin(), keys.end(), [](KeyFrame* k1, KeyFrame* k2){
-        //     return k1->id() < k2->id();
-        // });
-        // vector<Floor*> floors = h_graph->floors();
-        // vector<nav_msgs::Path> paths_floor;
-        // for(int i = 0; i < pub_floor_path_.size(); ++i){
-        //     nav_msgs::Path path;
-        //     path.header.frame_id = "map_optic";
-        //     path.header.stamp = ros::Time::now();
-        //     paths_floor.push_back(path);
-        // }
+        publishPath();
         
-        // for(int i = 0; i < keys.size(); ++i){
-        //     auto k = keys[i];
-        //     Eigen::Matrix4f pose = k->getPose() * OPTIC_TF.inverse();
-        //     geometry_msgs::PoseStamped p;
-        //     p.pose.position.x = pose(0, 3);
-        //     p.pose.position.y = pose(1, 3);
-        //     p.pose.position.z = pose(2, 3);
-        //     for(int fl = 0; fl < floors.size(); ++fl){
-        //         if(floors[fl] == k->getFloor()){
-        //             paths_floor[fl].poses.push_back(p);
-        //             break;
-        //         }
-        //     }
-        //     //cout<<p.pose.position.x<<" "<<p.pose.position.y<<" "<<p.pose.position.z<<endl;
-        //     //path.poses.push_back(p);
-        // }
-
-        // for(int i = 0; i < pub_floor_path_.size(); ++i){
-        //     pub_floor_path_[i].publish(paths_floor[i]);
-        // }
+        pcl::PointCloud<pcl::PointXYZRGB> obj_cloud;
+        for(const auto& obj : h_graph_.getEveryObjects()){
+            pcl::PointCloud<pcl::PointXYZRGB> ocl;
+            obj->getCloud(ocl);
+            obj_cloud += ocl;
+        }
         
-
-
-        
-        // pcl::PointCloud<pcl::PointXYZRGB> obj_cloud;
-
-        // for(const auto& obj : h_graph->getEveryObjects()){
-        //     pcl::PointCloud<pcl::PointXYZRGB> ocl;
-        //     obj->getCloud(ocl);
-        //     obj_cloud += ocl;
-        // }
-        
-        
-
-        // sensor_msgs::PointCloud2 obj_cloud_ros;
-        // pcl::toROSMsg(obj_cloud, obj_cloud_ros);
-        // obj_cloud_ros.header.frame_id = "map_optic";
-        // obj_cloud_ros.header.stamp = ros::Time::now();
-        // pub_object_cloud_.publish(obj_cloud_ros);
+        sensor_msgs::PointCloud2 obj_cloud_ros;
+        pcl::toROSMsg(obj_cloud, obj_cloud_ros);
+        obj_cloud_ros.header.frame_id = "map_optic";
+        obj_cloud_ros.header.stamp = ros::Time::now();
+        pub_object_cloud_.publish(obj_cloud_ros);
 
         // // sensor_msgs::PointCloud2 map_cloud_ros;
         // // pcl::toROSMsg(map_cloud, map_cloud_ros);
@@ -366,6 +464,34 @@ void SemanticSLAM::keyframeCallback(){
         // // visualization_msgs::MarkerArray h_graph_vis;
         // // visualizeHGraph(h_graph, h_graph_vis);
         // // pub_h_graph_.publish(h_graph_vis);     
+    }
+}
+
+void SemanticSLAM::loopQueryCallback(){
+    while(true){
+        unique_lock<mutex> key_lock(keyframe_lock_);
+        keyframe_cv_.wait(key_lock, [this]{return !this->lc_buf_.empty() || this->kill_flag_;});
+        if(kill_flag_){
+            thread_killed_ = true;
+            break;
+        }
+        while(!lc_buf_.empty()){
+            ORB_SLAM3::LoopQuery lq = lc_buf_.front();
+            if(isam_.valueExists(X(lq.id_query)) && isam_.valueExists(X(lq.id_target))){
+                auto loop_noise_ = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-2, 1e-2, 1e-2, 1e-1, 1e-1, 1e-1).finished());
+                gtsam::BetweenFactor<gtsam::Pose3> lc((X(lq.id_target)), X(lq.id_query), gtsam::Pose3(lq.drift.cast<double>()), loop_noise_);
+                gtsam_factors_.add(lc);
+            }
+            lc_buf_.pop();
+        }
+        isam_.update(gtsam_factors_);
+        gtsam_factors_.resize(0);
+        gtsam::Values opt = isam_.calculateEstimate();
+        for(auto& elem : kfs_){
+            gtsam::Pose3 opt_pose = opt.at<gtsam::Pose3>(X(elem.first));
+            elem.second->setPose(opt_pose.matrix().cast<float>());
+        }
+        h_graph_.refineObject();
     }
 }
 
