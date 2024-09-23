@@ -67,6 +67,28 @@
         for(int i = left; i <= min((int)raw_cloud.size()-1, right); ++i){
             cloud_.push_back(raw_cloud[i]);
         }
+
+        int cnt = 0;
+        double center_depth = 0.0;
+        cv::Point center_pix = roi_.tl() + cv::Point(roi_.width / 2, roi_.height / 2);
+        for(int r = max(0, center_pix.y - 1); r < min(center_pix.y + 2, color_mat.rows); ++r){
+            for(int c = max(0, center_pix.x - 1); c < min(center_pix.x + 2, color_mat.cols); ++c){
+                float depth = depth_mat.at<float>(r, c);
+                if(isnanf(depth) || depth < 1.0e-4){
+                    continue;
+                }
+                center_depth += depth;
+                cnt++;
+            }
+        }
+        center_depth /= cnt;
+        float x = (center_pix.x - K(0, 2)) * center_depth / K(0, 0);
+        float y = (center_pix.y - K(1, 2)) * center_depth / K(1, 1);
+        float z = center_depth;
+
+        centroid_(0) = x;
+        centroid_(1) = y;
+        centroid_(2) = z;
     }
 
     void Detection::getCloud(pcl::PointCloud<pcl::PointXYZRGB>& output) const{
@@ -82,7 +104,9 @@
         return dg_;
     }
 
-
+    Eigen::Vector3f Detection::center3D() const{
+        return centroid_;
+    }
     //=====================OCR DETECTION======================
     OCRDetection::OCRDetection(){
         
@@ -114,90 +138,94 @@
     }
     //======================OBJECT==============================
 
-    Object::Object(){
+    Object::Object() : centroid_(Eigen::Vector3f::Zero()), id_(0){
 
     }
 
-    Object::Object(const string& name): name_(name){
+    Object::Object(const string& name, size_t id): name_(name), id_(id), centroid_(Eigen::Vector3f::Zero()){
 
     }
 
-    Object::Object(const Object& obj): name_(obj.name_){
+    Object::Object(const Object& obj): name_(obj.name_), centroid_(obj.centroid_), id_(obj.id_){
     }
 
     string Object::getClassName() const{
         return name_;
     }
 
-    bool Object::getEstBbox(const Eigen::Matrix3f& K, const Eigen::Matrix4f& cam_in_map, cv::Rect& output) const{
-        Eigen::Matrix4f ext = cam_in_map.inverse();
-        float radii = 0.0;
-        Eigen::Vector3f center = Eigen::Vector3f::Zero();
-        pcl::PointCloud<pcl::PointXYZRGB> obj_cloud;
-        getCloud(obj_cloud);
-        for(const auto& pt : obj_cloud){
-            Eigen::Vector4f pt_v(pt.x, pt.y, pt.z, 1.0);
-            Eigen::Vector4f pt_cam = ext * pt_v;
-            center += pt_cam.block<3, 1>(0, 0);
-        }
-        center = center / (float)obj_cloud.size();
-        if(center(2) < 0.0){
-            return false;
-        }
+    void Object::setCentroid(const Eigen::Vector3f& centroid){
+        centroid_ = centroid;
+    }
 
-        Eigen::MatrixXf P = K* Eigen::MatrixXf::Identity(3, 4);
-        float xmin = 10000.0;
-        float ymin = 10000.0;
-        float xmax = 0.0;
-        float ymax = 0.0;
-        for(const auto& pt : obj_cloud){
-            Eigen::Vector4f pt_v(pt.x, pt.y, pt.z, 1.0);
-            Eigen::Vector4f pt_cam = ext * pt_v;
-            if(pt_cam(2) < 0.0){
-                continue;
-            }
-            Eigen::Vector3f pix = P * pt_cam;
-            pix /= pix(2);
-            xmin = min(pix(0), xmin);
-            ymin = min(pix(1), ymin);
-            xmax = max(pix(0), xmax);
-            ymax = max(pix(1), ymax);
-        }
-        if(xmin >= xmax || ymin >= ymax){
-            return false;
-        }
-        output = cv::Rect(cv::Point(xmin, ymin), cv::Point(xmax, ymax));
-        return true;
-    }
+    // bool Object::getEstBbox(const Eigen::Matrix3f& K, const Eigen::Matrix4f& cam_in_map, cv::Rect& output) const{
+    //     Eigen::Matrix4f ext = cam_in_map.inverse();
+    //     float radii = 0.0;
+    //     Eigen::Vector3f center = Eigen::Vector3f::Zero();
+    //     pcl::PointCloud<pcl::PointXYZRGB> obj_cloud;
+    //     getCloud(obj_cloud);
+    //     for(const auto& pt : obj_cloud){
+    //         Eigen::Vector4f pt_v(pt.x, pt.y, pt.z, 1.0);
+    //         Eigen::Vector4f pt_cam = ext * pt_v;
+    //         center += pt_cam.block<3, 1>(0, 0);
+    //     }
+    //     center = center / (float)obj_cloud.size();
+    //     if(center(2) < 0.0){
+    //         return false;
+    //     }
+
+    //     Eigen::MatrixXf P = K* Eigen::MatrixXf::Identity(3, 4);
+    //     float xmin = 10000.0;
+    //     float ymin = 10000.0;
+    //     float xmax = 0.0;
+    //     float ymax = 0.0;
+    //     for(const auto& pt : obj_cloud){
+    //         Eigen::Vector4f pt_v(pt.x, pt.y, pt.z, 1.0);
+    //         Eigen::Vector4f pt_cam = ext * pt_v;
+    //         if(pt_cam(2) < 0.0){
+    //             continue;
+    //         }
+    //         Eigen::Vector3f pix = P * pt_cam;
+    //         pix /= pix(2);
+    //         xmin = min(pix(0), xmin);
+    //         ymin = min(pix(1), ymin);
+    //         xmax = max(pix(0), xmax);
+    //         ymax = max(pix(1), ymax);
+    //     }
+    //     if(xmin >= xmax || ymin >= ymax){
+    //         return false;
+    //     }
+    //     output = cv::Rect(cv::Point(xmin, ymin), cv::Point(xmax, ymax));
+    //     return true;
+    // }
     
-    void Object::getCloud(pcl::PointCloud<pcl::PointXYZRGB>& output) const{
-        output.clear();
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr accum(new pcl::PointCloud<pcl::PointXYZRGB>());
-        pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
-        for(int i = 0; i < seens_.size(); i += 3){    
-            pcl::PointCloud<pcl::PointXYZRGB> det_cloud, cloud_tf;
-            seens_[i]->getCloud(det_cloud);
-            Eigen::Matrix4f base_in_map = seens_[i]->getDetectionGroup()->getKeyFrame()->getPose();
-            Eigen::Matrix4f cam_in_base = seens_[i]->getDetectionGroup()->getSensorPose();
-            Eigen::Matrix4f cam_in_map = base_in_map * cam_in_base;
-            pcl::transformPointCloud(det_cloud, cloud_tf, cam_in_map);
-            if(accum->empty()){
-                *accum += cloud_tf;
-            }
-            else{
-                for(const auto& pt : cloud_tf){
-                    vector<int> ids;
-                    vector<float> dists;
-                    kdtree.nearestKSearch(pt, 1, ids, dists);
-                    if(dists[0] > 0.1){
-                        accum->push_back(pt);
-                    }
-                }
-            }
-            kdtree.setInputCloud(accum);
-        }
-        output = *accum;
-    }
+    // void Object::getCloud(pcl::PointCloud<pcl::PointXYZRGB>& output) const{
+    //     output.clear();
+    //     pcl::PointCloud<pcl::PointXYZRGB>::Ptr accum(new pcl::PointCloud<pcl::PointXYZRGB>());
+    //     pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
+    //     for(int i = 0; i < seens_.size(); i += 3){    
+    //         pcl::PointCloud<pcl::PointXYZRGB> det_cloud, cloud_tf;
+    //         seens_[i]->getCloud(det_cloud);
+    //         Eigen::Matrix4f base_in_map = seens_[i]->getDetectionGroup()->getKeyFrame()->getPose();
+    //         Eigen::Matrix4f cam_in_base = seens_[i]->getDetectionGroup()->getSensorPose();
+    //         Eigen::Matrix4f cam_in_map = base_in_map * cam_in_base;
+    //         pcl::transformPointCloud(det_cloud, cloud_tf, cam_in_map);
+    //         if(accum->empty()){
+    //             *accum += cloud_tf;
+    //         }
+    //         else{
+    //             for(const auto& pt : cloud_tf){
+    //                 vector<int> ids;
+    //                 vector<float> dists;
+    //                 kdtree.nearestKSearch(pt, 1, ids, dists);
+    //                 if(dists[0] > 0.1){
+    //                     accum->push_back(pt);
+    //                 }
+    //             }
+    //         }
+    //         kdtree.setInputCloud(accum);
+    //     }
+    //     output = *accum;
+    // }
 
     void Object::addDetection(const Detection* det){
         seens_.push_back(det);
@@ -211,17 +239,22 @@
     }
 
     Eigen::Vector3f Object::getCentroid() const{
-        Eigen::Vector3f centroid;
-        pcl::PointCloud<pcl::PointXYZRGB> cloud;
-        getCloud(cloud);
+        // Eigen::Vector3f centroid;
+        // pcl::PointCloud<pcl::PointXYZRGB> cloud;
+        // getCloud(cloud);
 
-        pcl::PointXYZRGB cent;
-        pcl::computeCentroid(cloud, cent);
+        // pcl::PointXYZRGB cent;
+        // pcl::computeCentroid(cloud, cent);
 
-        centroid(0) = cent.x;
-        centroid(1) = cent.y;
-        centroid(2) = cent.z;
-        return centroid;
+        // centroid(0) = cent.x;
+        // centroid(1) = cent.y;
+        // centroid(2) = cent.z;
+        // return centroid;
+        return centroid_;
+    }
+
+    size_t Object::id() const{
+        return id_;
     }
 
     void Object::merge(Object* obj){
@@ -372,9 +405,9 @@
         Eigen::Matrix4f delta = plane_se3.inverse() * kf_se3;
         float dist = abs(delta(1, 3));//abs(a*x + b*y + c*z + d) / sqrt(a*a + b*b + c*c);
         bool res = dist < 1.5;
-        // if(!res){
-        //     cout<<"DIST ERR: "<<dist<<" kf: "<<kf->id<<endl;
-        // }
+        if(!res){
+            cout<<"DIST ERR: "<<dist<<" kf: "<<kf->id()<<endl;
+        }
         return res;
     }
 

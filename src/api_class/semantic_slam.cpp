@@ -1,5 +1,5 @@
 #include <semantic_slam/api_class/semantic_slam.h>
-SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false), depth_factor_(1000.0), floor_(nullptr), kf_updated_(false), last_key_(nullptr)
+SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false), depth_factor_(1000.0), floor_(nullptr), kf_updated_(false), last_key_(nullptr), last_oid_(-1)
 {
 
     string voc_file;
@@ -44,10 +44,14 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     sidecam_in_frontcam_(2, 3) = -0.065;
 
     K_side_ = Eigen::Matrix3f::Identity();
-    K_side_(0, 0) = 645.3115844726562;
-    K_side_(0, 2) = 644.2869873046875;
-    K_side_(1, 1) = 644.4506225585938;
-    K_side_(1, 2) = 361.4469299316406;
+    // K_side_(0, 0) = 645.3115844726562; //d455
+    // K_side_(0, 2) = 644.2869873046875;
+    // K_side_(1, 1) = 644.4506225585938;
+    // K_side_(1, 2) = 361.4469299316406;
+    K_side_(0, 0) = 927.8262329101562;
+    K_side_(0, 2) = 658.4143676757812;
+    K_side_(1, 1) = 928.4344482421875;
+    K_side_(1, 2) = 359.071044921875;
 
     //pub_path_ = nh_.advertise<nav_msgs::Path>("slam_path", 1);
     for(int i = 0; i < 10; ++i){
@@ -99,7 +103,7 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     // front_sync_.reset(new message_filters::Synchronizer<sync_pol> (sync_pol(1000), *front_color_, *front_depth_));
     // front_sync_->registerCallback(boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, _2, Eigen::Matrix4f::Identity(), K_front_));
 
-    //sub_frontcam_ = nh_.subscribe(rgb_topic, 1, &SemanticSLAM::frontCamCallback, this);
+    sub_frontcam_ = nh_.subscribe(rgb_topic, 1, &SemanticSLAM::frontCamCallback, this);
 }
 
 void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image){
@@ -191,20 +195,13 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
                 cv::putText(image, m.getClassName(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
             }
         }
-        // else if(m.getClassName() == "floor_sign"){
-        //     cv::Rect roi = m.getRoI();
-        //     cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
-        //     cv::putText(image, m.getClassName(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
-        //     ORB_SLAM3::OCRDetection text_out;
-        //     bool found_txt = ocr_->textRecognition(image, roi, text_out);
-        //     if(found_txt){
-        //         cout<<"FLOOR SIGN: "<<text_out.getContent()<<endl;
-        //     }
-        //     else{
-        //         cout<<"NOOOO"<<endl;
-        //     }
-        //     doors.push_back(m);
-        // }
+        else {
+            cv::Rect roi = m.getRoI();
+            cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
+            cv::putText(image, m.getClassName(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
+            
+            //doors.push_back(m);
+        }
     }
    
 
@@ -263,6 +260,137 @@ SemanticSLAM::~SemanticSLAM(){
 
 void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
     kf->setDetection(dgs);
+    vector<const DetectionGroup*> kf_dets;
+    kf->getDetection(kf_dets);
+
+    
+    if(last_key_ == nullptr){    
+        new_values_.insert(X(kf->id()), gtsam::Pose3(kf->getPose().cast<double>()));
+        gtsam_values_.insert(X(kf->id()), gtsam::Pose3(kf->getPose().cast<double>()));
+        auto init_pose_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-5, 1e-5, 1e-5, 1e-3, 1e-3, 1e-3).finished());
+        gtsam::PriorFactor<gtsam::Pose3> init(X(kf->id()), gtsam::Pose3(kf->getPose().cast<double>()), init_pose_noise);
+        gtsam_factors_.add(init);
+        new_factors_.add(init);
+        cout<<"INIT KF"<<endl;
+        //new_conns.add(init);
+    }
+    else{
+        auto pose_diff_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-2, 1e-2, 1e-2, 1e-1, 1e-1, 1e-1).finished());
+        Eigen::Matrix4f odom_meas = last_key_->getOdomPose().inverse() * kf->getOdomPose();
+        gtsam::BetweenFactor<gtsam::Pose3> bf(X(last_key_->id()), X(kf->id()),  gtsam::Pose3(odom_meas.cast<double>()), pose_diff_noise);
+        kf->setPose(last_key_->getPose() * odom_meas);
+        new_values_.insert(X(kf->id()), gtsam::Pose3(kf->getPose().cast<double>()));
+        gtsam_values_.insert(X(kf->id()), gtsam::Pose3(kf->getPose().cast<double>()));
+        gtsam_factors_.add(bf);
+        new_factors_.add(bf);
+        //new_conns.add(gtsam::BetweenFactor<gtsam::Pose3>(X(last_key_->id()), X(kf->id()),  p1.inverse()*p2, pose_diff_noise));
+    }
+    vector<Object*> tgt_objs = h_graph_.getObjects(kf->getFloor());
+    for(const auto& dg : kf_dets){
+        
+        Eigen::Matrix3f K = dg->getIntrinsic();
+        gtsam::Cal3_S2::shared_ptr K_gtsam(new gtsam::Cal3_S2(K(0, 0), K(1, 1), 0.0, K(0, 2), K(1, 2)));
+        vector<const Detection*> detections;
+        dg->detections(detections);
+        Eigen::Matrix4f cam_in_map = kf->getPose()* dg->getSensorPose();
+        if(!isam_.valueExists(S(kf->id())) && !new_values_.exists(S(kf->id()))){
+            new_values_.insert(S(kf->id()), gtsam::Pose3(cam_in_map.cast<double>()));
+            gtsam_values_.insert(S(kf->id()), gtsam::Pose3(cam_in_map.cast<double>()));
+            auto mount_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3).finished());
+            gtsam::BetweenFactor<gtsam::Pose3> mount(X(kf->id()), S(kf->id()), gtsam::Pose3(dg->getSensorPose().cast<double>()), mount_noise);
+            gtsam_factors_.add(mount);
+            new_factors_.add(mount);
+        }
+        cout<<"SIZE: "<<detections.size()<<endl;
+        for(auto& det : detections){
+            double min_err = 10000.0;
+            int idx = -1;
+            cv::Rect roi = det->getRoI();
+            cv::Point roi_center = roi.tl() + cv::Point(roi.width/ 2, roi.height/ 2);
+            for(int i = 0; i < tgt_objs.size(); ++i){   
+                Eigen::Vector3f obj_centroid = tgt_objs[i]->getCentroid();
+                Eigen::Vector4f obj_homo(obj_centroid(0), obj_centroid(1), obj_centroid(2), 1.0);
+                Eigen::Vector4f Tco = cam_in_map.inverse() * obj_homo;
+                if(Tco(2) < 0.0){
+                    continue;
+                }
+                Eigen::Vector3f pix_homo = K *Eigen::MatrixXf::Identity(3, 4) * Tco;
+                pix_homo = pix_homo / pix_homo(2);
+                cv::Point pix = cv::Point(pix_homo(0), pix_homo(1));
+                cv::Point2d diff = (roi_center - pix);
+                double err = sqrt(diff.x*diff.x + diff.y*diff.y);
+                if(err < min_err){
+                    min_err = err;
+                    idx = i;
+                }
+                
+            }
+
+            bool matched = true;
+            if(idx == -1){
+                matched = false;
+            }
+            else{
+                matched = (tgt_objs[idx]->getClassName() == det->getClassName() ? min_err < 200.0 : min_err < 150.0);
+            }
+
+
+            if(matched){ // matched
+                cout<<"MATCH"<<endl;
+                pcl::PointCloud<pcl::PointXYZRGB> cloud;
+                det->getCloud(cloud);
+                Object* best_obj = tgt_objs[idx];
+                best_obj->addDetection(det);
+                gtsam::noiseModel::Isotropic::shared_ptr pix_noise = gtsam::noiseModel::Isotropic::Sigma(2, 300.0);    
+                gtsam::GenericProjectionFactor<gtsam::Pose3, gtsam::Point3, gtsam::Cal3_S2> ibf(gtsam::Point2(roi_center.x, roi_center.y), pix_noise, S(kf->id()), O(best_obj->id()), K_gtsam);
+                gtsam_factors_.add(ibf);
+                new_factors_.add(ibf);
+            }
+            else{ //initialize
+                cout<<"INIT"<<endl;
+                pcl::PointCloud<pcl::PointXYZRGB> cloud;
+                det->getCloud(cloud);
+                if(!cloud.empty()){
+                    // pcl::PointCloud<pcl::PointXYZRGB> cloud_tf;
+                    // pcl::transformPointCloud(cloud, cloud_tf, cam_in_map);
+                    // pcl::PointXYZRGB pt;
+                    // pcl::computeCentroid(cloud_tf, pt);
+                    Object* new_obj = new Object(det->getClassName(), last_oid_ == -1 ? 0 : last_oid_ + 1);
+                    Eigen::Vector4f Pco = Eigen::Vector4f::Ones();
+                    Pco.block<3, 1>(0,0) = det->center3D();
+                    Eigen::Vector4f Pwo = cam_in_map * Pco;
+                    new_obj->addDetection(det);
+                    new_obj->setCentroid(Eigen::Vector3f(Pwo(0), Pwo(1), Pwo(2)));
+                    h_graph_.insert(kf->getFloor(), new_obj);
+                    auto init_obj_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(3) << 50.0, 50.0, 50.0).finished());
+                    gtsam::PriorFactor<gtsam::Point3> opf(O(new_obj->id()), gtsam::Point3(new_obj->getCentroid().cast<double>()), init_obj_noise);
+                    new_values_.insert(O(new_obj->id()), gtsam::Point3(new_obj->getCentroid().cast<double>()));
+                    gtsam_values_.insert(O(new_obj->id()), gtsam::Point3(new_obj->getCentroid().cast<double>()));
+                    gtsam_factors_.add(opf);
+                    new_factors_.add(opf);
+                    gtsam::noiseModel::Isotropic::shared_ptr pix_noise = gtsam::noiseModel::Isotropic::Sigma(2, 100.0);
+                    gtsam::GenericProjectionFactor<gtsam::Pose3, gtsam::Point3, gtsam::Cal3_S2> ibf(gtsam::Point2(roi_center.x, roi_center.y), pix_noise, S(kf->id()), O(new_obj->id()), K_gtsam);
+                    gtsam_factors_.add(ibf);
+                    new_factors_.add(ibf);
+                    last_oid_ = new_obj->id();
+                }
+            }
+        }
+    }
+    
+    //gtsam::NonlinearFactorGraph new_conns;
+    isam_.update(new_factors_, new_values_);
+    kfs_.insert(make_pair(kf->id(), kf));
+    new_factors_.resize(0);
+    new_values_.clear();
+
+    gtsam::Values opt = isam_.calculateEstimate();
+    for(auto& elem : kfs_){
+        gtsam::Pose3 opt_pose = opt.at<gtsam::Pose3>(X(elem.first));
+        elem.second->setPose(opt_pose.matrix().cast<float>());
+    }
+    h_graph_.updateObjectPoses(opt);
+
     if(floor_ == nullptr){
         floor_ = new Floor(0, kf);
         cout<<"Generate Floor"<<endl;
@@ -277,103 +405,15 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
         }
         else{
             floor_ = nullptr;
-        }
-    }
-    vector<const DetectionGroup*> kf_dets;
-    kf->getDetection(kf_dets);
-    for(const auto& dg : kf_dets){
-        Eigen::Matrix3f K = dg->getIntrinsic();
-        vector<const Detection*> detections;
-        dg->detections(detections);
-        Eigen::Matrix4f cam_in_map = kf->getPose()* dg->getSensorPose();
-
-        for(auto& det : detections){
-            cv::Rect box_est;
-            float max_score = 1.0;
-            int idx = -1;
-            vector<Object*> tgt_objs = h_graph_.getObjects(kf->getFloor(), det->getClassName());
-            for(int i = 0; i < tgt_objs.size(); ++i){   
-                //if(det->getClassName() == tgt_objs[i]->getClassName()){
-                    Eigen::Vector3f obj_centroid = tgt_objs[i]->getCentroid();
-                    //=============IOU Method================
-                    // tgt_objs[i]->getEstBbox(K, cam_in_map, box_est);
-                    // cv::Rect common = box_est & det->getRoI();
-                    // double iou = ((double)common.area())/(double)(det->getRoI().area() + box_est.area() - common.area());
-                    // if(iou > max_score){
-                    //     max_score = iou;
-                    //     idx = i;
-                    // }
-                    //=======================================
-
-                    //=============Euclidean Dist Method=====
-                    pcl::PointCloud<pcl::PointXYZRGB> cloud;
-                    det->getCloud(cloud);
-                    pcl::PointCloud<pcl::PointXYZRGB> cloud_tf;
-                    pcl::transformPointCloud(cloud, cloud_tf, cam_in_map);
-                    pcl::PointXYZRGB det_centroid;
-                    pcl::computeCentroid(cloud_tf, det_centroid);
-
-                    float dist = sqrt(pow(det_centroid.x- obj_centroid(0), 2) + pow(det_centroid.y- obj_centroid(1), 2) + pow(det_centroid.z- obj_centroid(2), 2));
-                    float score = 1.0 / dist;
-                    if(score > max_score){
-                        max_score = score;
-                        idx = i;
-                    }
-                    //=======================================
-                //}
-            }
-
-            if(idx != -1){ // matched
-                cout<<"MATCH"<<endl;
-                pcl::PointCloud<pcl::PointXYZRGB> cloud;
-                det->getCloud(cloud);
-                Object* best_obj = tgt_objs[idx];
-                best_obj->addDetection(det);
-            }
-            else{ //initialize
-                
-                pcl::PointCloud<pcl::PointXYZRGB> cloud;
-                det->getCloud(cloud);
-                if(!cloud.empty()){
-                    cout<<"INIT"<<endl;
-                    pcl::PointCloud<pcl::PointXYZRGB> cloud_tf;
-                    pcl::transformPointCloud(cloud, cloud_tf, cam_in_map);
-                    Object* new_obj = new Object(det->getClassName());
-                    new_obj->addDetection(det);
-                    h_graph_.insert(kf->getFloor(), new_obj);
+            for(const auto& f : h_graph_.floors()){
+                if(f->isInlier(kf)){
+                    floor_ = f;
+                    break;
                 }
-            
             }
-            //cout<<"===="<<endl;
-            
         }
     }
-
-    gtsam::Values new_vals;
     
-    //gtsam::NonlinearFactorGraph new_conns;
-    if(last_key_ == nullptr){    
-        new_vals.insert(X(kf->id()), gtsam::Pose3(kf->getPose().cast<double>()));
-        auto init_pose_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-5, 1e-5, 1e-5, 1e-4, 1e-4, 1e-4).finished());
-        gtsam::PriorFactor<gtsam::Pose3> init(X(kf->id()), gtsam::Pose3(kf->getPose().cast<double>()), init_pose_noise);
-        gtsam_factors_.add(init);
-        //new_conns.add(init);
-        
-    }
-    else{
-        
-        auto pose_diff_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-2, 1e-2, 1e-2, 1e-1, 1e-1, 1e-1).finished());
-        Eigen::Matrix4f odom_meas = last_key_->getOdomPose().inverse() * kf->getOdomPose();
-        gtsam::BetweenFactor<gtsam::Pose3> bf(X(last_key_->id()), X(kf->id()),  gtsam::Pose3(odom_meas.cast<double>()), pose_diff_noise);
-        kf->setPose(last_key_->getPose() * odom_meas);
-        new_vals.insert(X(kf->id()), gtsam::Pose3(kf->getPose().cast<double>()));
-        gtsam_factors_.add(bf);
-        //new_conns.add(gtsam::BetweenFactor<gtsam::Pose3>(X(last_key_->id()), X(kf->id()),  p1.inverse()*p2, pose_diff_noise));
-    }
-    isam_.update(gtsam_factors_, new_vals);
-    kfs_.insert(make_pair(kf->id(), kf));
-    gtsam_factors_.resize(0);
-
     last_key_ = kf;
 }
 
@@ -444,9 +484,18 @@ void SemanticSLAM::keyframeCallback(){
         
         pcl::PointCloud<pcl::PointXYZRGB> obj_cloud;
         for(const auto& obj : h_graph_.getEveryObjects()){
-            pcl::PointCloud<pcl::PointXYZRGB> ocl;
-            obj->getCloud(ocl);
-            obj_cloud += ocl;
+            // pcl::PointCloud<pcl::PointXYZRGB> ocl;
+            // obj->getCloud(ocl);
+            // obj_cloud += ocl;
+            Eigen::Vector3f centroid = obj->getCentroid();
+            pcl::PointXYZRGB pt;
+            pt.x = centroid(0);
+            pt.y = centroid(1);
+            pt.z = centroid(2);
+            pt.r = 255.0;
+            pt.g = 255.0;
+            pt.b = 255.0;
+            obj_cloud.push_back(pt);
         }
         
         sensor_msgs::PointCloud2 obj_cloud_ros;
@@ -477,21 +526,25 @@ void SemanticSLAM::loopQueryCallback(){
         }
         while(!lc_buf_.empty()){
             ORB_SLAM3::LoopQuery lq = lc_buf_.front();
-            if(isam_.valueExists(X(lq.id_query)) && isam_.valueExists(X(lq.id_target))){
-                auto loop_noise_ = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-2, 1e-2, 1e-2, 1e-1, 1e-1, 1e-1).finished());
+            if(isam_.valueExists(X(lq.id_query)) && isam_.valueExists(X(lq.id_target)) &&(kfs_[lq.id_query]->getFloor() == kfs_[lq.id_target]->getFloor())){
+                auto loop_noise_ = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-3, 1e-3, 1e-3, 1e-2, 1e-2, 1e-2).finished());
                 gtsam::BetweenFactor<gtsam::Pose3> lc((X(lq.id_target)), X(lq.id_query), gtsam::Pose3(lq.drift.cast<double>()), loop_noise_);
                 gtsam_factors_.add(lc);
+                new_factors_.add(lc);
             }
             lc_buf_.pop();
         }
-        isam_.update(gtsam_factors_);
-        gtsam_factors_.resize(0);
+        isam_.update(new_factors_);
+        new_factors_.resize(0);
+        //gtsam_factors_.resize(0);
         gtsam::Values opt = isam_.calculateEstimate();
         for(auto& elem : kfs_){
             gtsam::Pose3 opt_pose = opt.at<gtsam::Pose3>(X(elem.first));
             elem.second->setPose(opt_pose.matrix().cast<float>());
         }
-        h_graph_.refineObject();
+        h_graph_.updateObjectPoses(opt);
+        
+        //h_graph_.refineObject();
     }
 }
 

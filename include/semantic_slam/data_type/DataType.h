@@ -15,6 +15,19 @@
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/segmentation/sac_segmentation.h>
 
+#include <gtsam/geometry/Rot3.h>
+#include <gtsam/geometry/Point3.h>
+#include <gtsam/geometry/Pose3.h>
+#include <gtsam/slam/PriorFactor.h>
+#include <gtsam/slam/BetweenFactor.h>
+#include <gtsam/nonlinear/NonlinearFactorGraph.h>
+#include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
+#include <gtsam/nonlinear/Values.h>
+#include <gtsam/nonlinear/ISAM2.h>
+#include <gtsam/geometry/PinholeCamera.h>
+#include <gtsam/inference/Symbol.h>
+#include <gtsam/slam/ProjectionFactor.h>
+
 using namespace std;
 EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
     class DetectionGroup;
@@ -67,6 +80,8 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
             void setDetectionGroup(DetectionGroup* dg);
 
             const DetectionGroup* getDetectionGroup() const;
+        
+            Eigen::Vector3f center3D() const;
         private:
             cv::Rect roi_;
             cv::Mat mask_;
@@ -74,24 +89,30 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
             //string content_;
             pcl::PointCloud<pcl::PointXYZRGB> cloud_;
             DetectionGroup* dg_;
+            Eigen::Vector3f centroid_;
             
     };
 
     class Object{
-        
         public:
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+        private:
+            size_t id_;
+            Eigen::Vector3f centroid_;
+            string name_;
+            vector<const Detection*> seens_;
+        public:
             Object();
 
             Object(const Object& obj);
             
-            Object(const string& name);
+            Object(const string& name, size_t id);
 
             string getClassName() const;
 
-            bool getEstBbox(const Eigen::Matrix3f& K, const Eigen::Matrix4f& cam_in_map, cv::Rect& output) const;
+            // bool getEstBbox(const Eigen::Matrix3f& K, const Eigen::Matrix4f& cam_in_map, cv::Rect& output) const;
 
-            void getCloud(pcl::PointCloud<pcl::PointXYZRGB>& output) const;
+            // void getCloud(pcl::PointCloud<pcl::PointXYZRGB>& output) const;
         
             void addDetection(const Detection* det);
         
@@ -100,9 +121,10 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
             Eigen::Vector3f getCentroid() const;
 
             void merge(Object* obj);
-        private:
-            string name_;
-            vector<const Detection*> seens_;
+
+            void setCentroid(const Eigen::Vector3f& centroid);
+
+            size_t id() const;
     };
 
     

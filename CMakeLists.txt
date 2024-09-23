@@ -186,6 +186,7 @@ target_link_libraries(semantic_slam_dtype
   ${OpenCV_LIBS} 
   ${EIGEN3_LIBS}
   ${PCL_LIBRARIES}
+  gtsam
 )
 
 add_library(semantic_slam_algorithm
@@ -206,6 +207,7 @@ target_link_libraries(semantic_slam_algorithm
 ## Declare a C++ library
 add_library(semantic_slam_api
   src/api_class/semantic_slam.cpp
+  src/api_class/raw_wrapper.cpp
 )
 target_link_libraries(semantic_slam_api
   ${catkin_LIBRARIES}
@@ -228,17 +230,9 @@ target_link_libraries(test_semantic_slam
   semantic_slam_api
 )
 
-# add_executable(test_text_detection src/test_node/test_text_detection.cpp)
-# target_link_libraries(test_text_detection
-#   semantic_slam_api
-#   -ltesseract
-#   #cpprestsdk::cpprest
-# )
-
-add_executable(test_crnn src/test_node/test_crnn.cpp)
-target_link_libraries(test_crnn
+add_executable(test_wrapper src/test_node/test_wrapper.cpp)
+target_link_libraries(test_wrapper
   semantic_slam_api
-  #cpprestsdk::cpprest
 )
 
 ## Rename C++ executable without prefix

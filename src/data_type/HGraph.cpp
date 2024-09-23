@@ -35,6 +35,7 @@ void HGraph::insert(Floor* floor, Object* obj){
     
 }
 
+
 void HGraph::refineObject(){
     for(auto& fl_map : fl_name_objs_){
         for(auto& name_objs: fl_map.second){
@@ -43,7 +44,7 @@ void HGraph::refineObject(){
                 Object* obj1 = name_objs.second[i];
                 Eigen::Vector3f p1 = obj1->getCentroid();
                 Object* to_merge = nullptr;
-                float dist_min = 1.0;
+                float dist_min = 0.5;
                 for(const auto& obj2 : refined){
                     Eigen::Vector3f p2 = obj2->getCentroid();
                     if((p1 - p2).norm() < dist_min){
@@ -63,33 +64,6 @@ void HGraph::refineObject(){
             name_objs.second = refined;
         }
     }
-
-    // for(auto& fo_pair: h_graph_){
-    //     vector<Object*> refined;
-    //     for(int i = 0; i < fo_pair.second.size(); ++i){
-    //         Object* obj1 = fo_pair.second[i];
-    //         Eigen::Vector3f p1 = obj1->getCentroid();
-    //         Object* to_merge = nullptr;
-    //         float dist_min = 1.0;
-    //         for(const auto& obj2 : refined){
-    //             if(obj1->getClassName() == obj2->getClassName()){
-    //                 Eigen::Vector3f p2 = obj2->getCentroid();
-    //                 if((p1 - p2).norm() < dist_min){
-    //                     to_merge = obj2;
-    //                     dist_min = (p1 - p2).norm();
-    //                 }
-    //             }
-    //         }
-    //         if(to_merge == nullptr){
-    //             refined.push_back(obj1);
-    //         }
-    //         else{ //merge
-    //             to_merge->merge(obj1);
-    //             delete obj1;
-    //         }
-    //     }
-    //     fo_pair.second = refined;
-    // }
 }
 
 vector<Object*> HGraph::getObjects(Floor* floor, string obj_name){
@@ -97,7 +71,17 @@ vector<Object*> HGraph::getObjects(Floor* floor, string obj_name){
     if(fl_name_objs_.find(floor) == fl_name_objs_.end()){
         return emp;
     }
-    if(fl_name_objs_[floor].find(obj_name) == fl_name_objs_[floor].end()){
+    
+    if(obj_name.empty()){
+        auto objs = fl_name_objs_[floor];
+        for(const auto& name_objs : objs){
+            for(const auto obj : name_objs.second){
+                emp.push_back(obj);
+            }
+        }
+        return emp;
+    }
+    else if(fl_name_objs_[floor].find(obj_name) == fl_name_objs_[floor].end()){
         return emp;
     }
     return fl_name_objs_[floor][obj_name];
@@ -157,4 +141,16 @@ vector<Floor*> HGraph::floors() const{
         output.push_back(elem.first);
     }
     return output;
+}
+
+void HGraph::updateObjectPoses(const gtsam::Values& opt_stats){
+    for(const auto& fl_name : fl_name_objs_){
+        for(const auto& name_objs : fl_name.second){
+            for(auto& obj : name_objs.second){
+                if(opt_stats.exists(O(obj->id()))){
+                    obj->setCentroid(opt_stats.at<gtsam::Point3>(O(obj->id())).cast<float>());
+                }
+            }
+        }
+    }
 }

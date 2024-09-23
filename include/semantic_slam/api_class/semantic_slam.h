@@ -1,7 +1,6 @@
 #ifndef __SEMANTIC_SLAM_HEADER_H__
 #define __SEMANTIC_SLAM_HEADER_H__
 #include <ros/ros.h>
-//#include <include/System.h>
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <unordered_set>
@@ -41,18 +40,6 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <semantic_slam/data_type/KeyFrame.h>
 #include <semantic_slam/data_type/HGraph.h>
-
-#include <gtsam/geometry/Rot3.h>
-#include <gtsam/geometry/Point3.h>
-#include <gtsam/geometry/Pose3.h>
-#include <gtsam/slam/PriorFactor.h>
-#include <gtsam/slam/BetweenFactor.h>
-#include <gtsam/nonlinear/NonlinearFactorGraph.h>
-#include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
-#include <gtsam/nonlinear/Values.h>
-#include <gtsam/nonlinear/ISAM2.h>
-#include <gtsam/geometry/PinholeCamera.h>
-#include <gtsam/inference/Symbol.h>
 
 #include "System.h"
 #include "LoopQuery.h"
@@ -139,6 +126,8 @@ class SemanticSLAM{
         bool kf_updated_;
         queue<ORB_SLAM3::LoopQuery> lc_buf_;
         KeyFrame* last_key_;
+        int last_oid_;
+        //Object* last_obj_;
         unordered_map<size_t, KeyFrame*> kfs_;
         Floor* floor_;
         thread keyframe_thread_, loop_thread_;
@@ -147,9 +136,8 @@ class SemanticSLAM{
         void loopQueryCallback();
         HGraph h_graph_;
 
-        //Eigen::Matrix4f pose_offset_;
-
-        gtsam::NonlinearFactorGraph gtsam_factors_;
+        gtsam::Values gtsam_values_, new_values_;// for backup
+        gtsam::NonlinearFactorGraph gtsam_factors_, new_factors_; //for backup
         gtsam::ISAM2 isam_;
         
 

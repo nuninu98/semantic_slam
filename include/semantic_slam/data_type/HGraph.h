@@ -1,9 +1,12 @@
 #ifndef __HGRAPH_H__
 #define __HGRAPH_H__
 
-#include "DataType.h"
+#include <semantic_slam/data_type/DataType.h>
+#include "LoopQuery.h"
 
 using namespace std;
+using namespace gtsam::symbol_shorthand;
+
 
 class Floor;
 class Object;
@@ -24,13 +27,15 @@ class HGraph{
 
         void refineObject();
 
-        vector<Object*> getObjects(Floor* floor, string obj_name);
+        vector<Object*> getObjects(Floor* floor, string obj_name="");
 
         vector<Object*> getEveryObjects() const;
 
         void getMatchedKFs(KeyFrame* kf, unordered_map<KeyFrame*, float>& kf_scores);
     
         vector<Floor*> floors() const;
+
+        void updateObjectPoses(const gtsam::Values& opt_stats);
     };
 
 
