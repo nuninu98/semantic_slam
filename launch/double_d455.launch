@@ -8,7 +8,7 @@
         <param name="door_detection_onnx" value="/home/nuninu98/signage_detection.v1i.yolov8/runs/detect/train/weights/best.onnx"/>
         
         <param name="obj_detection_onnx" value="/home/nuninu98/junhyung/runs/segment/train/weights/best.onnx"/>
-        <param name="obj_detection_classes" value="$(find semantic_slam)/model/yolov8m_seg.txt"/>
+        <param name="obj_detection_classes" value="/home/nuninu98/junhyung/runs/segment/train/weights/class.txt"/>
         
         <param name="rgb_topic" value="/front/color/image_raw"/>
         <param name="depth_topic" value="/front/aligned_depth_to_color/image_raw"/>

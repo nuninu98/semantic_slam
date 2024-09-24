@@ -20,8 +20,7 @@ cv::Mat LandmarkDetector::formatToSquare(const cv::Mat& source){
     return result;
 }
 
-vector<Detection> LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image){
-    vector<Detection> objects;
+void LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image, vector<Detection>& detection_output){
     cv::Mat model_input = rgb_image;
 
     model_input = formatToSquare(model_input);
@@ -89,10 +88,8 @@ vector<Detection> LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image){
     for(int i = 0; i < nms_result.size(); ++i){
         int idx = nms_result[i];
         Detection detection(boxes[idx], cv::Mat(), class_names_[class_ids[idx]]);
-        objects.push_back(detection);
+        detection_output.push_back(detection);
     }
-  
-    return objects;
 }
 
 

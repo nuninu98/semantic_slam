@@ -9,12 +9,17 @@ using namespace std;
 class KeyFrame{
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+        //===Visualization===
+        cv::Mat color_;
+        cv::Mat depth_;
+        //===================
     private:
         Floor* floor_;
         size_t id_;
         Eigen::Matrix4f pose_;
         Eigen::Matrix4f odom_pose_;
         vector<DetectionGroup> detections_;
+        
     public:
         Eigen::Matrix4f getPose() const;
 

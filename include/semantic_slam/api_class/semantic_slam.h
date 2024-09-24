@@ -140,7 +140,7 @@ class SemanticSLAM{
         gtsam::NonlinearFactorGraph gtsam_factors_, new_factors_; //for backup
         gtsam::ISAM2 isam_;
         
-
+        void getMapCloud(pcl::PointCloud<pcl::PointXYZRGB>& output);
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         SemanticSLAM();

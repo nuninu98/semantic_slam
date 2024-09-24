@@ -30,6 +30,10 @@
 
 using namespace std;
 EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
+    struct ImageInfo{
+        cv::Size raw_size;
+	    cv::Vec4d trans;
+    };
     class DetectionGroup;
     class KeyFrame;
     class OCRDetection{

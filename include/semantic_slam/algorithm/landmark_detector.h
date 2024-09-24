@@ -35,7 +35,7 @@ class LandmarkDetector{
 
         ~LandmarkDetector();
         
-        vector<Detection> detectObjectYOLO(const cv::Mat& rgb_image);
+        void detectObjectYOLO(const cv::Mat& rgb_image, vector<Detection>& detection_output);
 
 
         vector<string> getClassNames() const;

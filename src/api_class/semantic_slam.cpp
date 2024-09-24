@@ -98,12 +98,10 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     side_sync_.reset(new message_filters::Synchronizer<sync_pol> (sync_pol(1000), *side_color_, *side_depth_));
     side_sync_->registerCallback(boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, _2, sidecam_in_frontcam_, K_side_));
 
-    // front_color_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, rgb_topic, 1));
-    // front_depth_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, depth_topic, 1));
-    // front_sync_.reset(new message_filters::Synchronizer<sync_pol> (sync_pol(1000), *front_color_, *front_depth_));
-    // front_sync_->registerCallback(boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, _2, Eigen::Matrix4f::Identity(), K_front_));
-
-    sub_frontcam_ = nh_.subscribe(rgb_topic, 1, &SemanticSLAM::frontCamCallback, this);
+    front_color_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, rgb_topic, 1));
+    front_depth_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, depth_topic, 1));
+    front_sync_.reset(new message_filters::Synchronizer<sync_pol> (sync_pol(1000), *front_color_, *front_depth_));
+    front_sync_->registerCallback(boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, _2, Eigen::Matrix4f::Identity(), K_front_));
 }
 
 void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image){
@@ -177,7 +175,15 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
     cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(color_image, "bgr8");
     cv_bridge::CvImageConstPtr cv_depth_bridge = cv_bridge::toCvShare(depth_image, depth_image->encoding);
     cv::Mat image = cv_rgb_bridge->image.clone();
-    vector<Detection> detections = door_detector_->detectObjectYOLO(image);
+    vector<Detection> detections;
+    if(sensor_pose == Eigen::Matrix4f::Identity()){
+        obj_detector_->detectObjectYOLO(image, detections);
+    }
+    else{
+        door_detector_->detectObjectYOLO(image, detections);
+    }
+    
+    
     //vector<OCRDetection> text_detections = ocr_->detect_rec(image);
     vector<Detection> doors;
     
@@ -195,13 +201,15 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
                 cv::putText(image, m.getClassName(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
             }
         }
-        else {
-            cv::Rect roi = m.getRoI();
-            cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
-            cv::putText(image, m.getClassName(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
-            
-            //doors.push_back(m);
-        }
+        // else {
+        //     cv::Rect roi = m.getRoI();
+        //     cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
+        //     cv::putText(image, m.getClassName(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
+        //     doors.push_back(m);
+        //     cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
+        //     cv::putText(image, m.getClassName(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));
+        //     //doors.push_back(m);
+        // }
     }
    
 
@@ -237,7 +245,8 @@ void SemanticSLAM::frontCamCallback(const sensor_msgs::ImageConstPtr& color_img)
     cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(color_img, "bgr8");
     cv::Mat color_mat = cv_rgb_bridge->image.clone();
     cv::Mat image = cv_rgb_bridge->image.clone();
-    auto detections = obj_detector_->detectObjectYOLO(color_mat);
+    vector<Detection> detections;
+    obj_detector_->detectObjectYOLO(color_mat, detections);
     for(auto& m : detections){
         cv::rectangle(image, m.getRoI(), cv::Scalar(0, 0, 255), 2);
         cv::putText(image, m.getClassName(), m.getRoI().tl(), 1, 2, cv::Scalar(0, 0, 255));    
@@ -262,8 +271,6 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
     kf->setDetection(dgs);
     vector<const DetectionGroup*> kf_dets;
     kf->getDetection(kf_dets);
-
-    
     if(last_key_ == nullptr){    
         new_values_.insert(X(kf->id()), gtsam::Pose3(kf->getPose().cast<double>()));
         gtsam_values_.insert(X(kf->id()), gtsam::Pose3(kf->getPose().cast<double>()));
@@ -287,21 +294,20 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
     }
     vector<Object*> tgt_objs = h_graph_.getObjects(kf->getFloor());
     for(const auto& dg : kf_dets){
-        
         Eigen::Matrix3f K = dg->getIntrinsic();
+        gtsam::Key sensor_id = dg->getSensorPose() == Eigen::Matrix4f::Identity() ? X(kf->id()) : S(kf->id());
         gtsam::Cal3_S2::shared_ptr K_gtsam(new gtsam::Cal3_S2(K(0, 0), K(1, 1), 0.0, K(0, 2), K(1, 2)));
         vector<const Detection*> detections;
         dg->detections(detections);
         Eigen::Matrix4f cam_in_map = kf->getPose()* dg->getSensorPose();
-        if(!isam_.valueExists(S(kf->id())) && !new_values_.exists(S(kf->id()))){
-            new_values_.insert(S(kf->id()), gtsam::Pose3(cam_in_map.cast<double>()));
-            gtsam_values_.insert(S(kf->id()), gtsam::Pose3(cam_in_map.cast<double>()));
+        if(!isam_.valueExists(sensor_id) && !new_values_.exists(sensor_id)){
+            new_values_.insert(sensor_id, gtsam::Pose3(cam_in_map.cast<double>()));
+            gtsam_values_.insert(sensor_id, gtsam::Pose3(cam_in_map.cast<double>()));
             auto mount_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3).finished());
-            gtsam::BetweenFactor<gtsam::Pose3> mount(X(kf->id()), S(kf->id()), gtsam::Pose3(dg->getSensorPose().cast<double>()), mount_noise);
+            gtsam::BetweenFactor<gtsam::Pose3> mount(X(kf->id()), sensor_id, gtsam::Pose3(dg->getSensorPose().cast<double>()), mount_noise);
             gtsam_factors_.add(mount);
             new_factors_.add(mount);
         }
-        cout<<"SIZE: "<<detections.size()<<endl;
         for(auto& det : detections){
             double min_err = 10000.0;
             int idx = -1;
@@ -336,18 +342,16 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
 
 
             if(matched){ // matched
-                cout<<"MATCH"<<endl;
                 pcl::PointCloud<pcl::PointXYZRGB> cloud;
                 det->getCloud(cloud);
                 Object* best_obj = tgt_objs[idx];
                 best_obj->addDetection(det);
                 gtsam::noiseModel::Isotropic::shared_ptr pix_noise = gtsam::noiseModel::Isotropic::Sigma(2, 300.0);    
-                gtsam::GenericProjectionFactor<gtsam::Pose3, gtsam::Point3, gtsam::Cal3_S2> ibf(gtsam::Point2(roi_center.x, roi_center.y), pix_noise, S(kf->id()), O(best_obj->id()), K_gtsam);
+                gtsam::GenericProjectionFactor<gtsam::Pose3, gtsam::Point3, gtsam::Cal3_S2> ibf(gtsam::Point2(roi_center.x, roi_center.y), pix_noise, sensor_id, O(best_obj->id()), K_gtsam);
                 gtsam_factors_.add(ibf);
                 new_factors_.add(ibf);
             }
             else{ //initialize
-                cout<<"INIT"<<endl;
                 pcl::PointCloud<pcl::PointXYZRGB> cloud;
                 det->getCloud(cloud);
                 if(!cloud.empty()){
@@ -362,14 +366,14 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
                     new_obj->addDetection(det);
                     new_obj->setCentroid(Eigen::Vector3f(Pwo(0), Pwo(1), Pwo(2)));
                     h_graph_.insert(kf->getFloor(), new_obj);
-                    auto init_obj_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(3) << 50.0, 50.0, 50.0).finished());
+                    auto init_obj_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(3) << 1.0, 1.0, 1.0).finished());
                     gtsam::PriorFactor<gtsam::Point3> opf(O(new_obj->id()), gtsam::Point3(new_obj->getCentroid().cast<double>()), init_obj_noise);
                     new_values_.insert(O(new_obj->id()), gtsam::Point3(new_obj->getCentroid().cast<double>()));
                     gtsam_values_.insert(O(new_obj->id()), gtsam::Point3(new_obj->getCentroid().cast<double>()));
                     gtsam_factors_.add(opf);
                     new_factors_.add(opf);
                     gtsam::noiseModel::Isotropic::shared_ptr pix_noise = gtsam::noiseModel::Isotropic::Sigma(2, 100.0);
-                    gtsam::GenericProjectionFactor<gtsam::Pose3, gtsam::Point3, gtsam::Cal3_S2> ibf(gtsam::Point2(roi_center.x, roi_center.y), pix_noise, S(kf->id()), O(new_obj->id()), K_gtsam);
+                    gtsam::GenericProjectionFactor<gtsam::Pose3, gtsam::Point3, gtsam::Cal3_S2> ibf(gtsam::Point2(roi_center.x, roi_center.y), pix_noise, sensor_id, O(new_obj->id()), K_gtsam);
                     gtsam_factors_.add(ibf);
                     new_factors_.add(ibf);
                     last_oid_ = new_obj->id();
@@ -477,6 +481,8 @@ void SemanticSLAM::keyframeCallback(){
         }
         object_lock_.unlock();
         KeyFrame* new_kf = new KeyFrame(orb_kf->mnId, orb_kf->GetPoseInverse().matrix());
+        new_kf->color_ = orb_kf->color_;
+        new_kf->depth_ = orb_kf->depth_;
         addKeyFrame(new_kf, detection_groups);
         kf_updated_ = false;    
         key_lock.unlock();
@@ -504,11 +510,21 @@ void SemanticSLAM::keyframeCallback(){
         obj_cloud_ros.header.stamp = ros::Time::now();
         pub_object_cloud_.publish(obj_cloud_ros);
 
-        // // sensor_msgs::PointCloud2 map_cloud_ros;
-        // // pcl::toROSMsg(map_cloud, map_cloud_ros);
-        // // map_cloud_ros.header.stamp = ros::Time::now();
-        // // map_cloud_ros.header.frame_id = "map_optic";
-        // // pub_map_cloud_.publish(map_cloud_ros);
+        if(kfs_.size() % 10 == 0){
+            pcl::PointCloud<pcl::PointXYZRGB> map_cloud;
+            getMapCloud(map_cloud);
+            sensor_msgs::PointCloud2 map_cloud_ros;
+            pcl::toROSMsg(map_cloud, map_cloud_ros);
+            map_cloud_ros.header.stamp = ros::Time::now();
+            map_cloud_ros.header.frame_id = "map_optic";
+            pub_map_cloud_.publish(map_cloud_ros);
+        }
+
+        // sensor_msgs::PointCloud2 map_cloud_ros;
+        // pcl::toROSMsg(map_cloud, map_cloud_ros);
+        // map_cloud_ros.header.stamp = ros::Time::now();
+        // map_cloud_ros.header.frame_id = "map_optic";
+        // pub_map_cloud_.publish(map_cloud_ros);
 
         // // visualization_msgs::MarkerArray h_graph_vis;
         // // visualizeHGraph(h_graph, h_graph_vis);
@@ -546,6 +562,48 @@ void SemanticSLAM::loopQueryCallback(){
         
         //h_graph_.refineObject();
     }
+}
+
+void SemanticSLAM::getMapCloud(pcl::PointCloud<pcl::PointXYZRGB>& output){
+    pcl::PCLPointCloud2::Ptr cloud(new pcl::PCLPointCloud2());
+    pcl::VoxelGrid<pcl::PCLPointCloud2> voxel;
+    voxel.setLeafSize(0.1, 0.1, 0.1);
+    for(size_t i = 0; i < kfs_.size(); i += 10){
+        if(kfs_.find(i) == kfs_.end()){
+            continue;
+        }
+        KeyFrame* kf = kfs_[i];
+        //=====Generate Cloud====
+        pcl::PointCloud<pcl::PointXYZRGB> raw_cloud, cloud_tf;
+        pcl::PCLPointCloud2 tf_pcl2;
+        for(int r = 0; r < kf->color_.rows; r += 3){
+            for(int c = 0; c < kf->color_.cols; c += 3){
+                float depth = kf->depth_.at<float>(r, c);
+                if(isnanf(depth) || depth < 1.0e-4 || depth > 5.0){
+                    continue;
+                }
+                Eigen::Vector3f pix(c, r, 1.0);
+                float x = (c - K_front_(0, 2)) * depth / K_front_(0, 0);
+                float y = (r - K_front_(1, 2)) * depth / K_front_(1, 1);
+                pcl::PointXYZRGB pt;
+                pt.x = x;
+                pt.y = y;
+                pt.z = depth;
+                pt.r = kf->color_.at<cv::Vec3b>(r, c)[2];
+                pt.g = kf->color_.at<cv::Vec3b>(r, c)[1];
+                pt.b = kf->color_.at<cv::Vec3b>(r, c)[0];
+                raw_cloud.push_back(pt);
+            }
+        }
+        pcl::transformPointCloud(raw_cloud, cloud_tf, kf->getPose());
+        pcl::toPCLPointCloud2(cloud_tf, tf_pcl2);
+        *cloud += tf_pcl2;
+        voxel.setInputCloud(cloud);
+        voxel.filter(*cloud);
+        //=======================
+    }
+    pcl::fromPCLPointCloud2(*cloud, output);
+    //output = *cloud;
 }
 
 void SemanticSLAM::visualizeHGraph(const HGraph& h_graph, visualization_msgs::MarkerArray& output){
