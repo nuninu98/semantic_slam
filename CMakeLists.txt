@@ -44,6 +44,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   tf2_ros
   visualization_msgs
+  gtsam_quadrics
 )
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV 4.7.0 REQUIRED)
@@ -51,7 +52,7 @@ find_package(Pangolin REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(PCL 1.8 REQUIRED)
 find_package(OpenMP)
-
+#find_package(gtsam_quadrics REQUIRED)
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
@@ -59,9 +60,6 @@ if (OPENMP_FOUND)
 endif()
 
 set(GTSAM_USE_SYSTEM_EIGEN=ON)
-message("EIGEN_WORLD_VERSION: ${EIGEN_VERSION}")
-message("GTSAM_EIGEN_WORLD_VERSION: ${GTSAM_EIGEN_VERSION}")
-message("GTSAM INCLUDE: ${GTSAM_INCLUDE_DIR}")
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -202,6 +200,7 @@ target_link_libraries(semantic_slam_algorithm
   #${ORB_SLAM3_DIR}/lib/libORB_SLAM3_DATA_TYPE.so
   semantic_slam_dtype
   gtsam
+  gtsam_quadrics
 )
 
 ## Declare a C++ library

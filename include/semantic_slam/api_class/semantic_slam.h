@@ -68,7 +68,6 @@ class SemanticSLAM{
         //============Test yolov8 seg=============
         ros::Subscriber sub_frontcam_;
 
-        void frontCamCallback(const sensor_msgs::ImageConstPtr& color_img);
         //========================================
         vector<cv::Scalar> colors_;
         shared_ptr<LandmarkDetector> door_detector_;
@@ -94,7 +93,7 @@ class SemanticSLAM{
         void imuCallback(const sensor_msgs::ImuConstPtr& imu);
 
         //void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const shared_ptr<LandmarkDetector>& detector, const Eigen::Matrix4f& sensor_pose);
-        void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, const Eigen::Matrix4f& sensor_pose, const Eigen::Matrix3f& K);
+        void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, const Eigen::Matrix4f& sensor_pose, const Eigen::Matrix3f& K, char sID);
         Eigen::Matrix4f sidecam_in_frontcam_; // optic
         double depth_factor_;
 
@@ -115,7 +114,7 @@ class SemanticSLAM{
         ros::Publisher pub_h_graph_;
         ros::Publisher pub_map_cloud_;
         
-        void visualizeHGraph(const HGraph& h_graph, visualization_msgs::MarkerArray& output);
+        void visualizeHGraph(visualization_msgs::MarkerArray& output);
         
         //=========Test Floor Plane===========
         ros::Publisher pub_floor_;

@@ -28,14 +28,17 @@
 #include <gtsam/inference/Symbol.h>
 #include <gtsam/slam/ProjectionFactor.h>
 
+#include <gtsam_quadrics/geometry/ConstrainedDualQuadric.h>
+#include <gtsam_quadrics/geometry/DualConic.h>
+#include <gtsam_quadrics/geometry/QuadricCamera.h>
+#include <gtsam_quadrics/geometry/BoundingBoxFactor.h>
+
 using namespace std;
 EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
-    struct ImageInfo{
-        cv::Size raw_size;
-	    cv::Vec4d trans;
-    };
+
     class DetectionGroup;
     class KeyFrame;
+    class Object;
     class OCRDetection{
         public:
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -67,7 +70,8 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
 
             ~Detection();   
 
-            cv::Rect getRoI() const;
+            cv::Rect getROI_CV() const;
+            gtsam_quadrics::AlignedBox2 getROI() const;
 
             cv::Mat getMask() const;
 
@@ -77,21 +81,25 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
 
             void copyContent(const OCRDetection& ocr_output);
 
-            void generateCloud(const cv::Mat& color_mat, const cv::Mat& depth_mat, const Eigen::Matrix3f& K);
+            void calcCentroid(const cv::Mat& color_mat, const cv::Mat& depth_mat, const Eigen::Matrix3f& K);
 
-            void getCloud(pcl::PointCloud<pcl::PointXYZRGB>& output) const;
+            //void getCloud(pcl::PointCloud<pcl::PointXYZRGB>& output) const;
 
             void setDetectionGroup(DetectionGroup* dg);
 
             const DetectionGroup* getDetectionGroup() const;
         
             Eigen::Vector3f center3D() const;
+
+            void setCorrespondence(Object* obj);
+
+            Object* getCorrespondence() const;
         private:
+            Object* matched_obj_ = nullptr;
             cv::Rect roi_;
             cv::Mat mask_;
             string name_;
             //string content_;
-            pcl::PointCloud<pcl::PointXYZRGB> cloud_;
             DetectionGroup* dg_;
             Eigen::Vector3f centroid_;
             
@@ -102,15 +110,16 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         private:
             size_t id_;
-            Eigen::Vector3f centroid_;
+            //Eigen::Vector3f centroid_;
             string name_;
             vector<const Detection*> seens_;
+            gtsam_quadrics::ConstrainedDualQuadric Q_;
         public:
             Object();
 
             Object(const Object& obj);
             
-            Object(const string& name, size_t id);
+            Object(const string& name, size_t id, const gtsam_quadrics::ConstrainedDualQuadric& Q);
 
             string getClassName() const;
 
@@ -122,13 +131,18 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
         
             void getConnectedKeyFrames(vector<KeyFrame*>& output) const;
         
-            Eigen::Vector3f getCentroid() const;
+            // Eigen::Vector3f getCentroid() const;
 
             void merge(Object* obj);
 
-            void setCentroid(const Eigen::Vector3f& centroid);
+            // void setCentroid(const Eigen::Vector3f& centroid);
 
             size_t id() const;
+
+            //=============Dual Quad test======
+            gtsam_quadrics::ConstrainedDualQuadric Q() const;
+
+            void setQ(const gtsam_quadrics::ConstrainedDualQuadric& Q);
     };
 
     
@@ -139,25 +153,25 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW      
         private:
             double stamp_;
-            cv::Mat color_img;
-            cv::Mat depth_img;
+            // cv::Mat color_img;
+            // cv::Mat depth_img;
             Eigen::Matrix4f sensor_pose_;
             Eigen::Matrix3f K_;
-            vector<Detection> detections_;
+            vector<Detection*> detections_;
             KeyFrame* kf_;
+            char sid_;
         public:
             DetectionGroup();
 
             DetectionGroup(const DetectionGroup& dg);
 
-            DetectionGroup(const cv::Mat& color, const cv::Mat& depth, const Eigen::Matrix4f& sensor_pose,
-            const vector<Detection>& detections, const Eigen::Matrix3f& K, double stamp);
+            DetectionGroup(const Eigen::Matrix4f& sensor_pose, const vector<Detection*>& detections, const Eigen::Matrix3f& K, double stamp, char sid);
 
             ~DetectionGroup();
 
             double stamp() const;
 
-            void detections(vector<const Detection*>& output) const;
+            void detections(vector<Detection*>& output) const;
 
             Eigen::Matrix4f getSensorPose() const;
 
@@ -166,6 +180,12 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
             void setKeyFrame(KeyFrame* kf);
 
             KeyFrame* getKeyFrame() const;
+
+            char sID() const;
+
+            // cv::Mat getColorImage() const;
+
+            // cv::Mat getDepthImage() const;
     };
 
     class Floor{

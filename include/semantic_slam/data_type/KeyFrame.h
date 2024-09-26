@@ -10,8 +10,8 @@ class KeyFrame{
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         //===Visualization===
-        cv::Mat color_;
-        cv::Mat depth_;
+        // cv::Mat color_;
+        // cv::Mat depth_;
         //===================
     private:
         Floor* floor_;

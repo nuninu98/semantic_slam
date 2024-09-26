@@ -27,6 +27,10 @@ void KeyFrame::setFloor(Floor* floor){
 void KeyFrame::setDetection(const vector<DetectionGroup>& dets){
     detections_ = dets;
     for(auto& elem : detections_){
+        if(elem.sID() == 'F'){
+            // depth_ = elem.getDepthImage().clone();
+            // color_ = elem.getColorImage().clone();
+        }
         elem.setKeyFrame(this);
     }
   

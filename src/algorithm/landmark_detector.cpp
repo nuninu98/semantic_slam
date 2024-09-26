@@ -20,7 +20,7 @@ cv::Mat LandmarkDetector::formatToSquare(const cv::Mat& source){
     return result;
 }
 
-void LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image, vector<Detection>& detection_output){
+void LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image, const cv::Mat& depth_image, const Eigen::Matrix3f& K, vector<Detection*>& detection_output){
     cv::Mat model_input = rgb_image;
 
     model_input = formatToSquare(model_input);
@@ -87,7 +87,8 @@ void LandmarkDetector::detectObjectYOLO(const cv::Mat& rgb_image, vector<Detecti
     cv::dnn::NMSBoxes(boxes, confidences, CONFIDENCE_THRESHOLD, NMS_TRESHOLD, nms_result);
     for(int i = 0; i < nms_result.size(); ++i){
         int idx = nms_result[i];
-        Detection detection(boxes[idx], cv::Mat(), class_names_[class_ids[idx]]);
+        Detection* detection = new Detection(boxes[idx], cv::Mat(), class_names_[class_ids[idx]]);
+        detection->calcCentroid(rgb_image, depth_image, K);
         detection_output.push_back(detection);
     }
 }

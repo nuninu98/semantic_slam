@@ -42,11 +42,11 @@ void HGraph::refineObject(){
             vector<Object*> refined;
             for(int i = 0; i < name_objs.second.size(); ++i){
                 Object* obj1 = name_objs.second[i];
-                Eigen::Vector3f p1 = obj1->getCentroid();
+                Eigen::Vector3d p1 = obj1->Q().centroid();
                 Object* to_merge = nullptr;
-                float dist_min = 0.5;
+                double dist_min = 0.5;
                 for(const auto& obj2 : refined){
-                    Eigen::Vector3f p2 = obj2->getCentroid();
+                    Eigen::Vector3d p2 = obj2->Q().centroid();
                     if((p1 - p2).norm() < dist_min){
                         to_merge = obj2;
                         dist_min = (p1 - p2).norm();
@@ -108,7 +108,7 @@ void HGraph::getMatchedKFs(KeyFrame* kf, unordered_map<KeyFrame*, float>& kf_sco
     vector<const DetectionGroup*> kf_dgs;
     kf->getDetection(kf_dgs);
     for(const auto& dg : kf_dgs){
-        vector<const Detection*> dets;
+        vector<Detection*> dets;
         dg->detections(dets);
         for(const auto& det : dets){
             string name = det->getClassName();
@@ -148,7 +148,8 @@ void HGraph::updateObjectPoses(const gtsam::Values& opt_stats){
         for(const auto& name_objs : fl_name.second){
             for(auto& obj : name_objs.second){
                 if(opt_stats.exists(O(obj->id()))){
-                    obj->setCentroid(opt_stats.at<gtsam::Point3>(O(obj->id())).cast<float>());
+                    obj->setQ(opt_stats.at<gtsam_quadrics::ConstrainedDualQuadric>(O(obj->id())));
+                    //obj->setCentroid(opt_stats.at<gtsam::Point3>(O(obj->id())).cast<float>());
                 }
             }
         }

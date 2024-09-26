@@ -11,8 +11,16 @@
 
     }
 
-    cv::Rect Detection::getRoI() const{
+    cv::Rect Detection::getROI_CV() const{
         return roi_;
+    }
+
+    gtsam_quadrics::AlignedBox2 Detection::getROI() const{
+        double xmin =roi_.x;
+        double xmax = roi_.x + roi_.width;
+        double ymin = roi_.y;
+        double ymax = roi_.y + roi_.height;
+        return gtsam_quadrics::AlignedBox2(xmin, ymin, xmax, ymax);
     }
 
     cv::Mat Detection::getMask() const{
@@ -32,41 +40,41 @@
         //content_ = ocr_output.getContent();
     }
 
-    void Detection::generateCloud(const cv::Mat& color_mat, const cv::Mat& depth_mat, const Eigen::Matrix3f& K){
-        if(!cloud_.empty()){
-            return;
-        }
-        vector<pcl::PointXYZRGB> raw_cloud;
-        for(int r = 0; r < color_mat.rows; r += 3){
-            for(int c = 0; c < color_mat.cols; c += 3){
-                float depth = depth_mat.at<float>(r, c);
-                if(isnanf(depth) || depth < 1.0e-4){
-                    continue;
-                }
-                if(!roi_.contains(cv::Point2i(c, r))){
-                    continue;
-                }
-                Eigen::Vector3f pix(c, r, 1.0);
-                float x = (c - K(0, 2)) * depth / K(0, 0);
-                float y = (r - K(1, 2)) * depth / K(1, 1);
-                pcl::PointXYZRGB pt;
-                pt.x = x;
-                pt.y = y;
-                pt.z = depth;
-                pt.r = color_mat.at<cv::Vec3b>(r, c)[2];
-                pt.g = color_mat.at<cv::Vec3b>(r, c)[1];
-                pt.b = color_mat.at<cv::Vec3b>(r, c)[0];
-                raw_cloud.push_back(pt);
-            }
-        }
-        sort(raw_cloud.begin(), raw_cloud.end(), [](const pcl::PointXYZRGB& pt1, const pcl::PointXYZRGB& pt2){
-            return pt1.z < pt2.z;
-        });
-        int left = (float)raw_cloud.size() * 0.1;
-        int right = (float)raw_cloud.size() * 0.9;
-        for(int i = left; i <= min((int)raw_cloud.size()-1, right); ++i){
-            cloud_.push_back(raw_cloud[i]);
-        }
+    void Detection::calcCentroid(const cv::Mat& color_mat, const cv::Mat& depth_mat, const Eigen::Matrix3f& K){
+        // if(!cloud_.empty()){
+        //     return;
+        // }
+        // vector<pcl::PointXYZRGB> raw_cloud;
+        // for(int r = 0; r < color_mat.rows; r += 3){
+        //     for(int c = 0; c < color_mat.cols; c += 3){
+        //         float depth = depth_mat.at<float>(r, c);
+        //         if(isnanf(depth) || depth < 1.0e-4){
+        //             continue;
+        //         }
+        //         if(!roi_.contains(cv::Point2i(c, r))){
+        //             continue;
+        //         }
+        //         Eigen::Vector3f pix(c, r, 1.0);
+        //         float x = (c - K(0, 2)) * depth / K(0, 0);
+        //         float y = (r - K(1, 2)) * depth / K(1, 1);
+        //         pcl::PointXYZRGB pt;
+        //         pt.x = x;
+        //         pt.y = y;
+        //         pt.z = depth;
+        //         pt.r = color_mat.at<cv::Vec3b>(r, c)[2];
+        //         pt.g = color_mat.at<cv::Vec3b>(r, c)[1];
+        //         pt.b = color_mat.at<cv::Vec3b>(r, c)[0];
+        //         raw_cloud.push_back(pt);
+        //     }
+        // }
+        // sort(raw_cloud.begin(), raw_cloud.end(), [](const pcl::PointXYZRGB& pt1, const pcl::PointXYZRGB& pt2){
+        //     return pt1.z < pt2.z;
+        // });
+        // int left = (float)raw_cloud.size() * 0.1;
+        // int right = (float)raw_cloud.size() * 0.9;
+        // for(int i = left; i <= min((int)raw_cloud.size()-1, right); ++i){
+        //     cloud_.push_back(raw_cloud[i]);
+        // }
 
         int cnt = 0;
         double center_depth = 0.0;
@@ -82,6 +90,12 @@
             }
         }
         center_depth /= cnt;
+        if(cnt == 0){
+            centroid_(0) = -1.0;
+            centroid_(1) = -1.0;
+            centroid_(2) = -1.0;
+            return; 
+        }
         float x = (center_pix.x - K(0, 2)) * center_depth / K(0, 0);
         float y = (center_pix.y - K(1, 2)) * center_depth / K(1, 1);
         float z = center_depth;
@@ -91,10 +105,10 @@
         centroid_(2) = z;
     }
 
-    void Detection::getCloud(pcl::PointCloud<pcl::PointXYZRGB>& output) const{
-        output.clear();
-        output = cloud_;
-    }
+    // void Detection::getCloud(pcl::PointCloud<pcl::PointXYZRGB>& output) const{
+    //     output.clear();
+    //     output = cloud_;
+    // }
 
     void Detection::setDetectionGroup(DetectionGroup* dg){
         dg_ = dg;
@@ -106,6 +120,14 @@
 
     Eigen::Vector3f Detection::center3D() const{
         return centroid_;
+    }
+
+    void Detection::setCorrespondence(Object* obj){
+        matched_obj_ = obj;
+    }
+
+    Object* Detection::getCorrespondence() const{
+        return matched_obj_;
     }
     //=====================OCR DETECTION======================
     OCRDetection::OCRDetection(){
@@ -138,24 +160,24 @@
     }
     //======================OBJECT==============================
 
-    Object::Object() : centroid_(Eigen::Vector3f::Zero()), id_(0){
+    Object::Object() : id_(0){
 
     }
 
-    Object::Object(const string& name, size_t id): name_(name), id_(id), centroid_(Eigen::Vector3f::Zero()){
+    Object::Object(const string& name, size_t id, const gtsam_quadrics::ConstrainedDualQuadric& Q): name_(name), id_(id), Q_(Q){
 
     }
 
-    Object::Object(const Object& obj): name_(obj.name_), centroid_(obj.centroid_), id_(obj.id_){
+    Object::Object(const Object& obj): name_(obj.name_), Q_(obj.Q_), id_(obj.id_){
     }
 
     string Object::getClassName() const{
         return name_;
     }
 
-    void Object::setCentroid(const Eigen::Vector3f& centroid){
-        centroid_ = centroid;
-    }
+    // void Object::setCentroid(const Eigen::Vector3f& centroid){
+    //     centroid_ = centroid;
+    // }
 
     // bool Object::getEstBbox(const Eigen::Matrix3f& K, const Eigen::Matrix4f& cam_in_map, cv::Rect& output) const{
     //     Eigen::Matrix4f ext = cam_in_map.inverse();
@@ -238,20 +260,20 @@
         }
     }
 
-    Eigen::Vector3f Object::getCentroid() const{
-        // Eigen::Vector3f centroid;
-        // pcl::PointCloud<pcl::PointXYZRGB> cloud;
-        // getCloud(cloud);
+    // Eigen::Vector3f Object::getCentroid() const{
+    //     // Eigen::Vector3f centroid;
+    //     // pcl::PointCloud<pcl::PointXYZRGB> cloud;
+    //     // getCloud(cloud);
 
-        // pcl::PointXYZRGB cent;
-        // pcl::computeCentroid(cloud, cent);
+    //     // pcl::PointXYZRGB cent;
+    //     // pcl::computeCentroid(cloud, cent);
 
-        // centroid(0) = cent.x;
-        // centroid(1) = cent.y;
-        // centroid(2) = cent.z;
-        // return centroid;
-        return centroid_;
-    }
+    //     // centroid(0) = cent.x;
+    //     // centroid(1) = cent.y;
+    //     // centroid(2) = cent.z;
+    //     // return centroid;
+    //     return centroid_;
+    // }
 
     size_t Object::id() const{
         return id_;
@@ -263,24 +285,29 @@
         }
     }
 
+    gtsam_quadrics::ConstrainedDualQuadric Object::Q() const{
+        return Q_;
+    }
+
+    void Object::setQ(const gtsam_quadrics::ConstrainedDualQuadric& Q){
+        Q_ = Q;
+    }
+
     //=====================DetectionGroup================
     DetectionGroup::DetectionGroup(){}
 
-    DetectionGroup::DetectionGroup(const DetectionGroup& dg) : color_img(dg.color_img), depth_img(dg.depth_img), 
-    sensor_pose_(dg.sensor_pose_), detections_(dg.detections_), K_(dg.K_), stamp_(dg.stamp_), kf_(dg.kf_){
+    DetectionGroup::DetectionGroup(const DetectionGroup& dg) : sensor_pose_(dg.sensor_pose_), detections_(dg.detections_), K_(dg.K_), stamp_(dg.stamp_), kf_(dg.kf_), sid_(dg.sid_){
         for(auto& elem : detections_){
-            elem.setDetectionGroup(this);
+            elem->setDetectionGroup(this);
         }
     }
 
-    DetectionGroup::DetectionGroup(const cv::Mat& color, const cv::Mat& depth, const Eigen::Matrix4f& sensor_pose,
-    const vector<Detection>& detections, const Eigen::Matrix3f& K, double stamp): color_img(color), depth_img(depth),
-    sensor_pose_(sensor_pose), stamp_(stamp), K_(K), detections_(detections), kf_(nullptr)
+    DetectionGroup::DetectionGroup(const Eigen::Matrix4f& sensor_pose, const vector<Detection*>& detections, const Eigen::Matrix3f& K, double stamp, char sid): sensor_pose_(sensor_pose), stamp_(stamp), K_(K), detections_(detections), kf_(nullptr), sid_(sid)
     {
     // detection sibal
         for(auto& elem : detections_){
-            elem.generateCloud(color, depth, K);
-            elem.setDetectionGroup(this);
+            //elem->generateCloud(color, depth, K);
+            elem->setDetectionGroup(this);
         }
     }
 
@@ -292,10 +319,10 @@
         return stamp_;
     }
 
-    void DetectionGroup::detections(vector<const Detection*>& output) const{
+    void DetectionGroup::detections(vector<Detection*>& output) const{
         output.clear();
         for(int i = 0; i < detections_.size(); ++i){
-            output.push_back(&detections_[i]);
+            output.push_back(detections_[i]);
         }
     }
 
@@ -314,6 +341,18 @@
     KeyFrame* DetectionGroup::getKeyFrame() const{
         return kf_;
     }
+
+    char DetectionGroup::sID() const{
+        return sid_;
+    }
+
+    // cv::Mat DetectionGroup::getColorImage() const{
+    //     return color_img;
+    // }
+
+    // cv::Mat DetectionGroup::getDepthImage() const{
+    //     return depth_img;
+    // }
 
     //=================Floor RANSAC================
     Floor::Floor(int label, KeyFrame* kf): label_(label), plane_kf_(kf){
