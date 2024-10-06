@@ -45,6 +45,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   visualization_msgs
   gtsam_quadrics
+  image_transport
 )
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV 4.7.0 REQUIRED)
@@ -171,6 +172,7 @@ include_directories(
   ${ORB_SLAM3_DIR}/include
   ${ORB_SLAM3_DIR}/include/CameraModels
   ${ORB_SLAM3_DIR}/Thirdparty/Sophus
+  ${ORB_SLAM3_DIR}/Thirdparty/DBoW2
   ${EIGEN3_INCLUDE_DIR}
   ${GTSAM_INCLUDE_DIR}
 )
@@ -184,6 +186,7 @@ target_link_libraries(semantic_slam_dtype
   ${OpenCV_LIBS} 
   ${EIGEN3_LIBS}
   ${PCL_LIBRARIES}
+  ${ORB_SLAM3_DIR}/lib/libORB_SLAM3.so
   gtsam
 )
 
@@ -231,6 +234,11 @@ target_link_libraries(test_semantic_slam
 
 add_executable(test_wrapper src/test_node/test_wrapper.cpp)
 target_link_libraries(test_wrapper
+  semantic_slam_api
+)
+
+add_executable(test_compress src/test_node/test_compress.cpp)
+target_link_libraries(test_compress
   semantic_slam_api
 )
 

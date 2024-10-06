@@ -151,6 +151,7 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
         
         public:
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW      
+            cv::Mat gray_;
         private:
             double stamp_;
             // cv::Mat color_img;

@@ -3,12 +3,14 @@
 
 #include <semantic_slam/data_type/DataType.h>
 #include <vector>
+#include "DBoW2/BowVector.h"
 class Floor;
 class DetectionGroup;
 using namespace std;
 class KeyFrame{
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+        DBoW2::BowVector bow_vec;
         //===Visualization===
         // cv::Mat color_;
         // cv::Mat depth_;

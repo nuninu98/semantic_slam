@@ -215,7 +215,8 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
         }
     }
    
-
+    cv::Mat Gray;
+    cv::cvtColor(image, Gray, cv::COLOR_BGR2GRAY);
     if(!doors.empty()){
         // cv::Mat color_mat = cv_rgb_bridge->image.clone();
         // cv::Mat depth_mat = cv_depth_bridge->image.clone();
@@ -225,6 +226,7 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& colo
         // }
 
         DetectionGroup dg(sensor_pose, doors, K, color_image->header.stamp.toSec(), sID);
+        dg.gray_ = Gray.clone();
         object_lock_.lock();
         obj_detection_buf_.push(dg);
         object_lock_.unlock();
@@ -266,9 +268,6 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
         floor_ = new Floor(0, kf);
         cout<<"Generate Floor"<<endl;
         kf->setFloor(floor_);
-        if(floor_ == nullptr){
-            cout<<"INSERT NULL 2"<<endl;
-        }
         h_graph_.insert(floor_);
     }
     else{
@@ -290,7 +289,7 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
             }
         }
     }
-    
+
     if(last_key_ == nullptr){    
         new_values_.insert(X(kf->id()), gtsam::Pose3(kf->getPose().cast<double>()));
         gtsam_values_.insert(X(kf->id()), gtsam::Pose3(kf->getPose().cast<double>()));
@@ -362,9 +361,9 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
                     }
                 }
             }
-            auto bbox_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(4) << 300.0, 300.0, 300.0, 300.0).finished());
+            auto bbox_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(4) << 50.0, 50.0, 50.0, 50.0).finished());
             if(matched){
-                gtsam_quadrics::BoundingBoxFactor bbf(meas, K_gtsam, sensor_id, O(matched_obj->id()), bbox_noise);
+                gtsam_quadrics::BoundingBoxFactor bbf(meas, K_gtsam, sensor_id, O(matched_obj->id()), bbox_noise, gtsam_quadrics::BoundingBoxFactor::TRUNCATED);
                 new_factors_.add(bbf);
                 det->setCorrespondence(matched_obj);
                 matched_obj->addDetection(det);
@@ -378,7 +377,7 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
                     continue;
                 }
                 
-                gtsam::Point3 up_vec = Twc.transformFrom(gtsam::Point3(0.0, -1.0, 0.0));
+                gtsam::Point3 up_vec = Twc.transformFrom(gtsam::Point3(0.0, 1.0, 0.0));
                 gtsam::Rot3 quadric_rotation = gtsam::PinholeCamera<gtsam::Cal3_S2>::Lookat(Twc.translation(), quadric_center, up_vec, *K_gtsam).pose().rotation();
                 
                 gtsam::Pose3 quadric_pose(quadric_rotation, quadric_center);
@@ -391,11 +390,12 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
                 new_obj->addDetection(det);
                 det->setCorrespondence(new_obj);
                 if(kf->getFloor() == nullptr){
-                    cout<<"INSERT NULL 1"<<endl;
+                    cout<<"NULL FLOOR INSERT"<<endl;
                 }
                 h_graph_.insert(kf->getFloor(), new_obj);
 
-                auto init_obj_noise = gtsam::noiseModel::Diagonal::Sigmas(Eigen::VectorXd::Ones(9));
+                //auto init_obj_noise = gtsam::noiseModel::Diagonal::Sigmas(Eigen::VectorXd::Ones(9));
+                auto init_obj_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(9) << 0.3, 0.3, 0.3, 1.0, 1.0, 1.0, 0.2, 0.2, 1.0).finished());
                 gtsam::PriorFactor<gtsam_quadrics::ConstrainedDualQuadric> opf(O(new_obj->id()), Q, init_obj_noise);
                 new_values_.insert(O(new_obj->id()), Q);
                 
@@ -488,8 +488,6 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
         elem.second->setPose(opt_pose.matrix().cast<float>());
     }
     h_graph_.updateObjectPoses(opt);
-
-    
     
     last_key_ = kf;
 }
@@ -539,6 +537,7 @@ void SemanticSLAM::keyframeCallback(){
             break;
         }
         auto orb_kf = visual_odom_->getLastKF();
+
         double stamp = orb_kf->mTimeStamp;
         vector<DetectionGroup> detection_groups;
         unordered_map<char, DetectionGroup> id_dg;
@@ -564,6 +563,7 @@ void SemanticSLAM::keyframeCallback(){
             detection_groups.push_back(elem.second);
         }
         KeyFrame* new_kf = new KeyFrame(orb_kf->mnId, orb_kf->GetPoseInverse().matrix());
+        new_kf->bow_vec = orb_kf->mBowVec;
         // new_kf->color_ = orb_kf->color_;
         // new_kf->depth_ = orb_kf->depth_;
         addKeyFrame(new_kf, detection_groups);
@@ -589,7 +589,42 @@ void SemanticSLAM::keyframeCallback(){
 
         visualization_msgs::MarkerArray h_graph_vis;
         visualizeHGraph(h_graph_vis);
-        pub_h_graph_.publish(h_graph_vis);     
+        pub_h_graph_.publish(h_graph_vis);
+
+        // vector<pair<KeyFrame*, float>> loop_candidates;
+        // findSemanticLoopCandidates(new_kf, kfs_.size(), loop_candidates);
+        // if(loop_candidates.empty()){
+        //     continue;
+        // }
+        // if(loop_candidates[0].second < 0.5){
+        //     continue;
+        // }
+        //===========Test===============
+        // string fileFolder = "/home/nuninu98/loopscore/";
+        // ofstream semantic_score(fileFolder + "sem"+to_string(new_kf->id())+".txt", ios::app);
+        // ofstream bow_score(fileFolder + "bow"+to_string(new_kf->id())+".txt", ios::app);
+        // for(int i = 0; i < loop_candidates.size(); ++i){
+        //     semantic_score << loop_candidates[i].first->id()<<" "<<loop_candidates[i].second<<endl;
+        // }
+        // for(int i = 0; i < loop_candidates.size(); ++i){
+        //     //bow_score << lq.candidates[i].second<<" "<<lq.candidates[i].first<<endl;
+        //     bow_score << loop_candidates[i].first->id()<<" "<<L1Score(kfs_[new_kf->id()]->bow_vec, loop_candidates[i].first->bow_vec) <<endl;
+        // }
+        // string queryFolder = "/home/nuninu98/loopscore/" + to_string(new_kf->id())+"/";
+        // if(!boost::filesystem::exists(queryFolder)){
+        //     boost::filesystem::create_directory(queryFolder);
+        // }
+        // vector<const DetectionGroup*> query_dgs, best_sem_dgs;
+        // new_kf->getDetection(query_dgs);
+        // loop_candidates[0].first->getDetection(best_sem_dgs);
+        // for(auto& elem : query_dgs){
+        //     cv::imwrite(queryFolder + "query_img"+elem->sID() + ".png", elem->gray_); 
+        // }
+
+        // for(auto& elem : best_sem_dgs){
+        //     cv::imwrite(queryFolder + to_string(loop_candidates[0].first->id())+elem->sID() + ".png", elem->gray_); 
+        // }
+        //==============================
     }
 }
 
@@ -601,6 +636,8 @@ void SemanticSLAM::loopQueryCallback(){
             thread_killed_ = true;
             break;
         }
+        cout<<"QUERY!"<<endl;
+        
         while(!lc_buf_.empty()){
             ORB_SLAM3::LoopQuery lq = lc_buf_.front();
             if(isam_.valueExists(X(lq.id_query)) && isam_.valueExists(X(lq.id_target)) &&(kfs_[lq.id_query]->getFloor() == kfs_[lq.id_target]->getFloor())){
@@ -610,7 +647,46 @@ void SemanticSLAM::loopQueryCallback(){
                 new_factors_.add(lc);
             }
             lc_buf_.pop();
+            //===========Test===============
+            vector<pair<KeyFrame*, float>> loop_candidates;
+            findSemanticLoopCandidates(kfs_[lq.id_query], kfs_.size(), loop_candidates);
+            if(loop_candidates.empty()){
+                continue;
+            }
+            // if(loop_candidates[0].second < 0.5){
+            //     continue;
+            // }
+            string fileFolder = "/home/nuninu98/loopscore/";
+            ofstream semantic_score(fileFolder + "sem"+to_string(lq.id_query)+".txt", ios::app);
+            ofstream bow_score(fileFolder + "bow"+to_string(lq.id_query)+".txt", ios::app);
+            for(int i = 0; i < loop_candidates.size(); ++i){
+                semantic_score << loop_candidates[i].first->id()<<" "<<loop_candidates[i].second<<endl;
+            }
+            for(int i = 0; i < loop_candidates.size(); ++i){
+                //bow_score << lq.candidates[i].second<<" "<<lq.candidates[i].first<<endl;
+                bow_score << loop_candidates[i].first->id()<<" "<<L1Score(kfs_[lq.id_query]->bow_vec, loop_candidates[i].first->bow_vec) <<endl;
+            }
+            string queryFolder = "/home/nuninu98/loopscore/" + to_string(lq.id_query)+"/";
+            if(!boost::filesystem::exists(queryFolder)){
+                boost::filesystem::create_directory(queryFolder);
+            }
+            // vector<const DetectionGroup*> query_dgs, best_sem_dgs;
+            // kfs_[lq.id_query]->getDetection(query_dgs);
+            // loop_candidates[0].first->getDetection(best_sem_dgs);
+            // for(auto& elem : query_dgs){
+            //     cv::imwrite(queryFolder + "query_img"+elem->sID() + ".png", elem->gray_); 
+            // }
+
+            // for(auto& elem : best_sem_dgs){
+            //     cv::imwrite(queryFolder + to_string(loop_candidates[0].first->id())+elem->sID() + ".png", elem->gray_); 
+            // }
+        //==============================
+            
         }
+
+        
+
+        
         isam_.update(new_factors_);
         new_factors_.resize(0);
         //gtsam_factors_.resize(0);
@@ -664,7 +740,7 @@ void SemanticSLAM::getMapCloud(pcl::PointCloud<pcl::PointXYZRGB>& output){
     //     //=======================
     // }
     // pcl::fromPCLPointCloud2(*cloud, output);
-    //output = *cloud;
+    // output = *cloud;
 }
 
 void SemanticSLAM::visualizeHGraph(visualization_msgs::MarkerArray& output){
@@ -678,16 +754,22 @@ void SemanticSLAM::visualizeHGraph(visualization_msgs::MarkerArray& output){
         id++;
         obj_marker.header.stamp = ros::Time::now();
         obj_marker.header.frame_id ="map_optic";
-        if(obj->getClassName().find("room_number") == string::npos){
+        if(obj->getClassName() == "room_sign"){
             obj_marker.color.a = 1.0;
             obj_marker.color.r = 0.0;
-            obj_marker.color.g = 255.0;
+            obj_marker.color.g = 0.0;
+            obj_marker.color.b = 255.0;
+        }
+        else if(obj->getClassName()== "extinguisher"){
+            obj_marker.color.a = 1.0;
+            obj_marker.color.r = 255.0;
+            obj_marker.color.g = 0.0;
             obj_marker.color.b = 0.0;
         }
         else{
             obj_marker.color.a = 1.0;
-            obj_marker.color.r = 255.0;
-            obj_marker.color.g = 0.0;
+            obj_marker.color.r = 0.0;
+            obj_marker.color.g = 255.0;
             obj_marker.color.b = 0.0;
         }
         
@@ -798,3 +880,80 @@ void SemanticSLAM::visualizeHGraph(visualization_msgs::MarkerArray& output){
     // }
 }
 
+void SemanticSLAM::findSemanticLoopCandidates(KeyFrame* kf, int N, vector<pair<KeyFrame*, float>>& output){
+    unordered_map<KeyFrame*, float> kf_scores;
+    h_graph_.getMatchedKFs(kf, kf_scores);
+    vector<pair<KeyFrame*, float>> score_sorted;
+    for(const auto& elem : kf_scores){
+        if(kf->id() - elem.first->id() > 500){
+            score_sorted.push_back(elem);
+        }
+        
+    }
+
+    // if(score_sorted.size() < N){
+    //     cout<<"SIBAL??"<<endl;
+    //     return;
+    // }
+
+    sort(score_sorted.begin(), score_sorted.end(), [](const pair<KeyFrame*, float>& p1, const pair<KeyFrame*, float>& p2){
+        //return p1.first->id() < p2.first->id();
+        return p1.second > p2.second;
+    });
+
+    float score_thresh = 0.0;
+    for(int i = 0; i < score_sorted.size(); ++i){
+        if(score_sorted[i].second > score_thresh){
+            output.push_back(score_sorted[i]);
+        }
+        // else{
+        //     return;
+        // }
+    }
+}
+
+double SemanticSLAM::L1Score(const DBoW2::BowVector &v1, const DBoW2::BowVector &v2) const{
+    DBoW2::BowVector::const_iterator v1_it, v2_it;
+    const DBoW2::BowVector::const_iterator v1_end = v1.end();
+    const DBoW2::BowVector::const_iterator v2_end = v2.end();
+    
+    v1_it = v1.begin();
+    v2_it = v2.begin();
+    
+    double score = 0;
+    
+    while(v1_it != v1_end && v2_it != v2_end)
+    {
+        const DBoW2::WordValue& vi = v1_it->second;
+        const DBoW2::WordValue& wi = v2_it->second;
+        
+        if(v1_it->first == v2_it->first)
+        {
+        score += fabs(vi - wi) - fabs(vi) - fabs(wi);
+        
+        // move v1 and v2 forward
+        ++v1_it;
+        ++v2_it;
+        }
+        else if(v1_it->first < v2_it->first)
+        {
+        // move v1 forward
+        v1_it = v1.lower_bound(v2_it->first);
+        // v1_it = (first element >= v2_it.id)
+        }
+        else
+        {
+        // move v2 forward
+        v2_it = v2.lower_bound(v1_it->first);
+        // v2_it = (first element >= v1_it.id)
+        }
+    }
+    
+    // ||v - w||_{L1} = 2 + Sum(|v_i - w_i| - |v_i| - |w_i|) 
+    //		for all i | v_i != 0 and w_i != 0 
+    // (Nister, 2006)
+    // scaled_||v - w||_{L1} = 1 - 0.5 * ||v - w||_{L1}
+    score = -score/2.0;
+
+    return score; // [0..1]
+}

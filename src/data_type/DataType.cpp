@@ -296,7 +296,7 @@
     //=====================DetectionGroup================
     DetectionGroup::DetectionGroup(){}
 
-    DetectionGroup::DetectionGroup(const DetectionGroup& dg) : sensor_pose_(dg.sensor_pose_), detections_(dg.detections_), K_(dg.K_), stamp_(dg.stamp_), kf_(dg.kf_), sid_(dg.sid_){
+    DetectionGroup::DetectionGroup(const DetectionGroup& dg) : sensor_pose_(dg.sensor_pose_), detections_(dg.detections_), K_(dg.K_), stamp_(dg.stamp_), kf_(dg.kf_), sid_(dg.sid_), gray_(dg.gray_){
         for(auto& elem : detections_){
             elem->setDetectionGroup(this);
         }

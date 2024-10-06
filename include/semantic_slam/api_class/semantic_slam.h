@@ -140,6 +140,10 @@ class SemanticSLAM{
         gtsam::ISAM2 isam_;
         
         void getMapCloud(pcl::PointCloud<pcl::PointXYZRGB>& output);
+    
+        void findSemanticLoopCandidates(KeyFrame* kf, int N, vector<pair<KeyFrame*, float>>& output);
+    
+        double L1Score(const DBoW2::BowVector &v1, const DBoW2::BowVector &v2) const;
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         SemanticSLAM();
