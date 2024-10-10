@@ -40,12 +40,13 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <semantic_slam/data_type/KeyFrame.h>
 #include <semantic_slam/data_type/HGraph.h>
-
+#include <yolo_protocol/YoloResult.h>
 #include "System.h"
 #include "LoopQuery.h"
 using namespace std;
 
-typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
+typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, yolo_protocol::YoloResult> yolo_sync_pol;
+typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> track_sync_pol;
 using namespace gtsam::symbol_shorthand;
 class SemanticSLAM{
     private:
@@ -56,15 +57,17 @@ class SemanticSLAM{
         ORB_SLAM3::System* visual_odom_;
         shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> tracking_color_;
         shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> tracking_depth_;
-        shared_ptr< message_filters::Synchronizer<sync_pol>> tracking_sync_;
+        shared_ptr< message_filters::Synchronizer<track_sync_pol>> tracking_sync_;
 
         shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> side_color_;
         shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> side_depth_;
-        shared_ptr< message_filters::Synchronizer<sync_pol>> side_sync_;
+        shared_ptr<message_filters::Subscriber<yolo_protocol::YoloResult>> side_yolo_;
+        shared_ptr< message_filters::Synchronizer<yolo_sync_pol>> side_sync_;
 
         shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> front_color_;
         shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> front_depth_;
-        shared_ptr< message_filters::Synchronizer<sync_pol>> front_sync_;
+        shared_ptr<message_filters::Subscriber<yolo_protocol::YoloResult>> front_yolo_;
+        shared_ptr< message_filters::Synchronizer<yolo_sync_pol>> front_sync_;
         //============Test yolov8 seg=============
         ros::Subscriber sub_frontcam_;
 
@@ -93,7 +96,8 @@ class SemanticSLAM{
         void imuCallback(const sensor_msgs::ImuConstPtr& imu);
 
         //void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const shared_ptr<LandmarkDetector>& detector, const Eigen::Matrix4f& sensor_pose);
-        void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const sensor_msgs::ImageConstPtr& depth_image, const Eigen::Matrix4f& sensor_pose, const Eigen::Matrix3f& K, char sID);
+      
+        void detectionImageCallback(const sensor_msgs::ImageConstPtr& depth_image, const yolo_protocol::YoloResultConstPtr& yolo_result, const Eigen::Matrix4f& sensor_pose, const Eigen::Matrix3f& K, char sID);
         Eigen::Matrix4f sidecam_in_frontcam_; // optic
         double depth_factor_;
 
@@ -123,6 +127,9 @@ class SemanticSLAM{
         //=============Test new struct========
         condition_variable keyframe_cv_;
         bool kf_updated_;
+        mutex loop_lock_;
+        condition_variable loop_cv_;
+
         queue<ORB_SLAM3::LoopQuery> lc_buf_;
         KeyFrame* last_key_;
         int last_oid_;

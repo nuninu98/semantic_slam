@@ -99,39 +99,46 @@ vector<Object*> HGraph::getEveryObjects() const{
     return tmp;
 }
 
-void HGraph::getMatchedKFs(KeyFrame* kf, unordered_map<KeyFrame*, float>& kf_scores){
+void HGraph::getMatchedKFs(KeyFrame* kf, unordered_map<KeyFrame*, float>& kf_scores, unordered_map<string, float>& obj_score){
     Floor* kf_floor = kf->getFloor();
     if(fl_name_objs_.find(kf_floor) == fl_name_objs_.end()){
         return;
     }
     auto name_objs = fl_name_objs_[kf_floor];
-    vector<const DetectionGroup*> kf_dgs;
-    kf->getDetection(kf_dgs);
-    for(const auto& dg : kf_dgs){
-        vector<Detection*> dets;
-        dg->detections(dets);
-        for(const auto& det : dets){
-            string name = det->getClassName();
-            if(name_objs.find(name) == name_objs.end()){
-                continue;
-            }
-            for(const auto& obj : name_objs[name]){
-                vector<KeyFrame*> conns;
-                obj->getConnectedKeyFrames(conns);
-                for(const auto& pkf : conns){
-                    unsigned long id1 = max(pkf->id(), kf->id());
-                    unsigned long id2 = min(pkf->id(), kf->id());
-                    if(id1 - id2 < 500){
-                        continue;
-                    }
-                    if(kf_scores.find(pkf) == kf_scores.end()){
-                        kf_scores.insert(make_pair(pkf, 0.0));
-                    }
-                    kf_scores[pkf] += 1.0 / name_objs[name].size();
+    vector<Detection*> kf_dets;
+    kf->getDetections(kf_dets);
+    for(const auto& det : kf_dets){
+        string name = det->getClassName();
+        if(name_objs.find(name) == name_objs.end()){
+            continue;
+        }
+        
+        if(obj_score.find(name) == obj_score.end()){
+            obj_score.insert(make_pair(name, 1.0 / name_objs[name].size()));
+        }
+        for(const auto& obj : name_objs[name]){
+            vector<KeyFrame*> conns;
+            obj->getConnectedKeyFrames(conns);
+            for(auto& ckf : conns){
+                if(kf_scores.find(ckf) == kf_scores.end()){
+                    kf_scores.insert(make_pair(ckf, 0.0));
                 }
             }
         }
     }
+    unordered_set<string> used_classes;
+    for(const auto& det : kf_dets){
+        if(used_classes.find(det->getClassName()) == used_classes.end()){
+            int N_qkf = kf->numDetectionsWithName(det->getClassName());
+            for(auto& ks_pair :kf_scores){
+                int N_tkf = ks_pair.first->numDetectionsWithName(det->getClassName());
+                int cnt = min(N_tkf, N_qkf);
+                ks_pair.second += cnt * (1.0 / name_objs[det->getClassName()].size());
+            }
+            used_classes.insert(det->getClassName());
+        }
+    }
+    
 
 }
 

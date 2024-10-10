@@ -6,6 +6,7 @@
 #include "DBoW2/BowVector.h"
 class Floor;
 class DetectionGroup;
+class Detection;
 using namespace std;
 class KeyFrame{
     public:
@@ -37,11 +38,17 @@ class KeyFrame{
         void setDetection(const vector<DetectionGroup>& dets);
             
 
-        void getDetection(vector<const DetectionGroup*>& output) const;
+        void getDetectionGroup(vector<const DetectionGroup*>& output) const;
+
+        void getDetections(vector<Detection*>& output) const;
 
         void setPose(const Eigen::Matrix4f& pose);
         
         size_t id() const;
+
+        void printDets() const;
+
+        int numDetectionsWithName(const string& name);
 };
 
 #endif

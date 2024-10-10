@@ -16,7 +16,7 @@
 #include <opencv2/cudaimgproc.hpp>
 using namespace std;
 
-const double CONFIDENCE_THRESHOLD = 0.5;
+const double CONFIDENCE_THRESHOLD = 0.6;
 const double NMS_TRESHOLD = 0.4;
 class LandmarkDetector{
     private:

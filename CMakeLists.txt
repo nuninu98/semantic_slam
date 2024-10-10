@@ -46,6 +46,7 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   gtsam_quadrics
   image_transport
+  yolo_protocol
 )
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV 4.7.0 REQUIRED)

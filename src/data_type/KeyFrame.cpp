@@ -36,10 +36,20 @@ void KeyFrame::setDetection(const vector<DetectionGroup>& dets){
   
 }
 
-void KeyFrame::getDetection(vector<const DetectionGroup*>& output) const{
+void KeyFrame::getDetectionGroup(vector<const DetectionGroup*>& output) const{
     output.clear();
     for(int i = 0; i < detections_.size(); ++i){
         output.push_back(&detections_[i]);
+    }
+}
+
+void KeyFrame::getDetections(vector<Detection*>& output) const{
+    for(auto& elem : detections_){
+        vector<Detection*> dets;
+        elem.detections(dets);
+        for(auto& det : dets){
+            output.push_back(det);
+        }
     }
 }
 
@@ -49,4 +59,30 @@ void KeyFrame::setPose(const Eigen::Matrix4f& pose){
 
 size_t KeyFrame::id() const{
     return id_;
+}
+
+void KeyFrame::printDets() const{
+    cout<<"KF "<<id()<<": ";
+    for(auto& dg : detections_){
+        vector<Detection*> dets;
+        dg.detections(dets);
+        for(auto& det : dets){
+            cout<<(det->getClassName())<<" ";
+        }
+    }
+    cout<<endl;
+}
+
+int KeyFrame::numDetectionsWithName(const string& name){
+    int answer = 0;
+    for(auto& dg : detections_){
+        vector<Detection*> dets;
+        dg.detections(dets);
+        for(auto& det : dets){
+            if(name == det->getClassName()){
+                answer++;
+            }
+        }
+    }
+    return answer;
 }

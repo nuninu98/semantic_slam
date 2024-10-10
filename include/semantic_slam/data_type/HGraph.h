@@ -31,7 +31,7 @@ class HGraph{
 
         vector<Object*> getEveryObjects() const;
 
-        void getMatchedKFs(KeyFrame* kf, unordered_map<KeyFrame*, float>& kf_scores);
+        void getMatchedKFs(KeyFrame* kf, unordered_map<KeyFrame*, float>& kf_scores, unordered_map<string, float>& obj_score);
     
         vector<Floor*> floors() const;
 

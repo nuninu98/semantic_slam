@@ -184,6 +184,8 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
 
             char sID() const;
 
+            DetectionGroup& operator=(const DetectionGroup& dg);
+
             // cv::Mat getColorImage() const;
 
             // cv::Mat getDepthImage() const;
