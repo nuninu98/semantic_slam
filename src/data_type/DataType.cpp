@@ -40,69 +40,81 @@
         //content_ = ocr_output.getContent();
     }
 
-    void Detection::calcCentroid(const cv::Mat& color_mat, const cv::Mat& depth_mat, const Eigen::Matrix3f& K){
-        // if(!cloud_.empty()){
-        //     return;
-        // }
-        // vector<pcl::PointXYZRGB> raw_cloud;
-        // for(int r = 0; r < color_mat.rows; r += 3){
-        //     for(int c = 0; c < color_mat.cols; c += 3){
-        //         float depth = depth_mat.at<float>(r, c);
-        //         if(isnanf(depth) || depth < 1.0e-4){
-        //             continue;
-        //         }
-        //         if(!roi_.contains(cv::Point2i(c, r))){
-        //             continue;
-        //         }
-        //         Eigen::Vector3f pix(c, r, 1.0);
-        //         float x = (c - K(0, 2)) * depth / K(0, 0);
-        //         float y = (r - K(1, 2)) * depth / K(1, 1);
-        //         pcl::PointXYZRGB pt;
-        //         pt.x = x;
-        //         pt.y = y;
-        //         pt.z = depth;
-        //         pt.r = color_mat.at<cv::Vec3b>(r, c)[2];
-        //         pt.g = color_mat.at<cv::Vec3b>(r, c)[1];
-        //         pt.b = color_mat.at<cv::Vec3b>(r, c)[0];
-        //         raw_cloud.push_back(pt);
-        //     }
-        // }
-        // sort(raw_cloud.begin(), raw_cloud.end(), [](const pcl::PointXYZRGB& pt1, const pcl::PointXYZRGB& pt2){
-        //     return pt1.z < pt2.z;
-        // });
-        // int left = (float)raw_cloud.size() * 0.1;
-        // int right = (float)raw_cloud.size() * 0.9;
-        // for(int i = left; i <= min((int)raw_cloud.size()-1, right); ++i){
-        //     cloud_.push_back(raw_cloud[i]);
-        // }
-
-        int cnt = 0;
-        double center_depth = 0.0;
-        cv::Point center_pix = roi_.tl() + cv::Point(roi_.width / 2, roi_.height / 2);
-        for(int r = max(0, center_pix.y - 1); r < min(center_pix.y + 2, color_mat.rows); ++r){
-            for(int c = max(0, center_pix.x - 1); c < min(center_pix.x + 2, color_mat.cols); ++c){
-                float depth = depth_mat.at<float>(r, c);
+    void Detection::calcInitQuadric(const cv::Mat& depth_scaled, const cv::Mat& mask, const Eigen::Matrix3f& K){
+        cv::Mat depth_masked;
+        depth_scaled.copyTo(depth_masked, mask);
+        
+        pcl::PointCloud<pcl::PointXYZ> cloud;
+        vector<pcl::PointXYZ> sort_pt;
+        for(int r = roi_.y; r < roi_.y+ roi_.height; ++r){
+            for(int c = roi_.x; c < roi_.x + roi_.width; ++c){
+                float depth = depth_masked.at<float>(r, c);
                 if(isnanf(depth) || depth < 1.0e-4){
                     continue;
                 }
-                center_depth += depth;
-                cnt++;
+                pcl::PointXYZ pt;
+                pt.x = (c - K(0, 2)) * depth / K(0, 0);
+                pt.y = (r - K(1, 2)) * depth / K(1, 1);
+                pt.z = depth;
+                //cloud.push_back(pt);
+                sort_pt.push_back(pt);
             }
         }
-        center_depth /= cnt;
-        if(cnt == 0){
-            centroid_(0) = -1.0;
-            centroid_(1) = -1.0;
-            centroid_(2) = -1.0;
-            return; 
+        sort(sort_pt.begin(), sort_pt.end(), [](const pcl::PointXYZ& p1, const pcl::PointXYZ& p2){
+            return p1.z < p2.z;
+        });
+        int max_ = sort_pt.size() * 0.8;
+        for(int i = 0; i < max_; ++i){
+            cloud.push_back(sort_pt[i]);
         }
-        float x = (center_pix.x - K(0, 2)) * center_depth / K(0, 0);
-        float y = (center_pix.y - K(1, 2)) * center_depth / K(1, 1);
-        float z = center_depth;
+        if(cloud.size() < 10){
+            Q_ = gtsam_quadrics::ConstrainedDualQuadric(gtsam::Pose3(), gtsam::Vector3(0, 0, 0));
+            return;
+        }
+        depth_cloud_ = cloud;
+        Eigen::Vector4f centroid;
+        pcl::compute3DCentroid(cloud, centroid);
+        pcl::PointXYZ min_pt, max_pt;
+        pcl::getMinMax3D(cloud, min_pt, max_pt);
 
-        centroid_(0) = x;
-        centroid_(1) = y;
-        centroid_(2) = z;
+        Eigen::Vector3f center = (max_pt.getVector3fMap() + min_pt.getVector3fMap())/2.0;
+
+        Eigen::Matrix3f covariance;
+        pcl::computeCovarianceMatrixNormalized(cloud, centroid, covariance);
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
+        Eigen::Matrix3f eigenVectorsPCA = eigen_solver.eigenvectors();
+	    Eigen::Vector3f eigenValuesPCA  = eigen_solver.eigenvalues();
+
+        eigenVectorsPCA.col(2) = eigenVectorsPCA.col(0).cross(eigenVectorsPCA.col(1)); 
+        eigenVectorsPCA.col(0) = eigenVectorsPCA.col(1).cross(eigenVectorsPCA.col(2));
+        eigenVectorsPCA.col(1) = eigenVectorsPCA.col(2).cross(eigenVectorsPCA.col(0));
+
+        Eigen::Matrix3f eigenVectorsPCA1;
+        eigenVectorsPCA1.col(0) = eigenVectorsPCA.col(2);
+        eigenVectorsPCA1.col(1) = eigenVectorsPCA.col(1);
+        eigenVectorsPCA1.col(2) = eigenVectorsPCA.col(0);
+        eigenVectorsPCA = eigenVectorsPCA1;
+
+        Eigen::Vector3f ea = (eigenVectorsPCA).eulerAngles(2, 1, 0); //yaw pitch roll
+        Eigen::AngleAxisf keep_Z_Rot(ea[0], Eigen::Vector3f::UnitZ());
+        Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+        transform.translate(center);  
+        transform.rotate(keep_Z_Rot);
+         
+        pcl::PointCloud<pcl::PointXYZ> transformedCloud;
+        pcl::transformPointCloud(cloud, transformedCloud, transform.inverse());
+        pcl::PointXYZ min_pt_T, max_pt_T;
+        pcl::getMinMax3D(transformedCloud, min_pt_T, max_pt_T);
+        Eigen::Vector3f center_new = (max_pt_T.getVector3fMap() + min_pt_T.getVector3fMap()) / 2;
+        Eigen::Vector3f box_dim;
+        box_dim = max_pt_T.getVector3fMap() - min_pt_T.getVector3fMap();
+        Eigen::Affine3f transform2 = Eigen::Affine3f::Identity();
+        transform2.translate(center_new);
+        Eigen::Affine3f transform3 = transform * transform2;
+
+        gtsam::Pose3 pose(transform3.matrix().cast<double>());
+        Q_= gtsam_quadrics::ConstrainedDualQuadric(pose, box_dim.cast<double>());
+        // return Q;
     }
 
     // void Detection::getCloud(pcl::PointCloud<pcl::PointXYZRGB>& output) const{
@@ -116,10 +128,6 @@
 
     const DetectionGroup* Detection::getDetectionGroup() const{
         return dg_;
-    }
-
-    Eigen::Vector3f Detection::center3D() const{
-        return centroid_;
     }
 
     void Detection::setCorrespondence(Object* obj){

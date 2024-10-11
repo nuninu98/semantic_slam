@@ -181,22 +181,27 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& dept
         depth_mat.convertTo(depth_scaled,CV_32F, 1.0/depth_factor_);
     }
     vector<Detection*> detections;
-    // if(sensor_pose == Eigen::Matrix4f::Identity()){
-    //     obj_detector_->detectObjectYOLO(image, depth_scaled, K ,detections);
-    // }
-    // else{
-    //     door_detector_->detectObjectYOLO(image, depth_scaled, K, detections);
-    // }
     if(!init){
         door_detector_->detectObjectYOLO(image, depth_scaled, K, detections);
         init = true;
     }
     
     detections.clear();
-    for(const auto& detect : yolo_result->detections.detections){
+    for(int i = 0; i < yolo_result->detections.detections.size(); ++i){
+        auto detect = yolo_result->detections.detections[i];
+        
+        cv::Mat mask;
+        if(!yolo_result->masks[i].data.empty()){
+            sensor_msgs::ImageConstPtr mask_msg = boost::make_shared<sensor_msgs::Image const>(yolo_result->masks[i]);
+            cv_bridge::CvImageConstPtr mask_cv = cv_bridge::toCvShare(mask_msg, "mono8");
+            mask = mask_cv->image.clone();
+        }
         cv::Rect roi(cv::Point(detect.bbox.center.x- detect.bbox.size_x/2, detect.bbox.center.y - detect.bbox.size_y/2), cv::Size(detect.bbox.size_x, detect.bbox.size_y));
+        
+        cv::Mat img_gray;
+        cv::cvtColor(image, img_gray, cv::COLOR_BGR2GRAY);
         Detection* det_p = new Detection(roi, cv::Mat(), detect.header.frame_id);
-        det_p->calcCentroid(image, depth_scaled, K);
+        det_p->calcInitQuadric(depth_scaled, mask, K);
         detections.push_back(det_p);
     }
     
@@ -211,9 +216,6 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& dept
                 cv::rectangle(image, roi, cv::Scalar(0, 0, 255), 2);
                 cv::putText(image, m->getClassName(), roi.tl(), 1, 2, cv::Scalar(0, 0, 255));
             }
-        }
-        else if(m->getClassName() == "desk"){
-            continue;
         }
         else {
             cv::rectangle(image, m->getROI_CV(), cv::Scalar(0, 0, 255), 2);
@@ -321,6 +323,7 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
         //dg->sID() == 'X' ? X(kf->id()) : S(kf->id());
         gtsam::Cal3_S2::shared_ptr K_gtsam(new gtsam::Cal3_S2(K(0, 0), K(1, 1), 0.0, K(0, 2), K(1, 2)));
         Eigen::Matrix4f cam_in_map = kf->getPose()* det->getDetectionGroup()->getSensorPose();
+        gtsam::Pose3 Twc = gtsam::Pose3(cam_in_map.cast<double>());
         gtsam_quadrics::QuadricCamera quadric_cam;
         
         if(!isam_.valueExists(sensor_id) && !new_values_.exists(sensor_id)){
@@ -335,86 +338,98 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
         int img_width = 1280;
         int img_height = 720;
         
-            //===========IOU METHOD============
-            double max_iou = 0.0;
-            Object* matched_obj = nullptr;
-            gtsam_quadrics::AlignedBox2 meas = det->getROI();
-            if(meas.xmin() < boundary_thresh || meas.xmax() > img_width - boundary_thresh || meas.ymin() < boundary_thresh || meas.ymax() > img_height - boundary_thresh){
+        //===========IOU METHOD============
+        double max_iou = 0.0;
+        Object* matched_obj = nullptr;
+        gtsam_quadrics::AlignedBox2 meas = det->getROI();
+        // if(meas.xmin() < boundary_thresh || meas.xmax() > img_width - boundary_thresh || meas.ymin() < boundary_thresh || meas.ymax() > img_height - boundary_thresh){
+        //     continue;
+        // }
+        for(int i = 0; i < tgt_objs.size(); ++i){
+            gtsam_quadrics::ConstrainedDualQuadric Q_obj = tgt_objs[i]->Q();
+            if(Q_obj.contains(Twc) || Q_obj.isBehind(Twc)){
                 continue;
             }
-            for(int i = 0; i < tgt_objs.size(); ++i){
-                gtsam_quadrics::ConstrainedDualQuadric Q_obj = tgt_objs[i]->Q();
-                gtsam_quadrics::AlignedBox2 est = quadric_cam.project(Q_obj, gtsam::Pose3(cam_in_map.cast<double>()), K_gtsam).bounds();
-                double iou = meas.iou(est);
-                if(iou > max_iou){
-                    matched_obj = tgt_objs[i];
-                    max_iou = iou;
+            gtsam_quadrics::AlignedBox2 est = quadric_cam.project(Q_obj, gtsam::Pose3(cam_in_map.cast<double>()), K_gtsam).bounds();
+            double iou = meas.iou(est);
+            if(iou > max_iou){
+                matched_obj = tgt_objs[i];
+                max_iou = iou;
+            }
+        }
+
+        bool matched = false;
+        if(matched_obj == nullptr){
+            matched = false;
+        }
+        else{
+            matched = max_iou > 0.2;
+            if(!matched){
+                gtsam_quadrics::AlignedBox2 est = quadric_cam.project(matched_obj->Q(), gtsam::Pose3(cam_in_map.cast<double>()), K_gtsam).bounds();
+                gtsam::Point2 est_center = est.center();
+                gtsam::Point2 meas_center = meas.center();
+                double dist = (est_center - meas_center).norm();
+                if(dist < max(est.width(), est.height())){
+                    matched = true;
                 }
             }
+        }
+        gtsam::Vector4 bbox_noise_vec(30.0, 30.0, 30.0, 30.0);
+        if(max_iou > 1.0e-5){
+            bbox_noise_vec = bbox_noise_vec * (1.0 / max_iou);
+        }
+        auto bbox_noise = gtsam::noiseModel::Diagonal::Sigmas(bbox_noise_vec);
+        if(matched){
+            gtsam_quadrics::BoundingBoxFactor bbf(meas, K_gtsam, sensor_id, O(matched_obj->id()), bbox_noise, gtsam_quadrics::BoundingBoxFactor::TRUNCATED);
+            new_factors_.add(bbf);
+            det->setCorrespondence(matched_obj);
+            matched_obj->addDetection(det);
+        }
+        else{
+            
+            gtsam_quadrics::ConstrainedDualQuadric dQc = det->Q_;
+            gtsam::Pose3 dQc_pose = dQc.pose();
 
-            bool matched = false;
-            if(matched_obj == nullptr){
-                matched = false;
+            if(dQc_pose.z() > 5.0 || dQc_pose.z() < 0){ // too far
+                continue;
             }
-            else{
-                matched = max_iou > 0.2;
-                if(!matched){
-                    gtsam_quadrics::AlignedBox2 est = quadric_cam.project(matched_obj->Q(), gtsam::Pose3(cam_in_map.cast<double>()), K_gtsam).bounds();
-                    gtsam::Point2 est_center = est.center();
-                    gtsam::Point2 meas_center = meas.center();
-                    double dist = (est_center - meas_center).norm();
-                    if(dist < max(est.width(), est.height())){
-                        matched = true;
-                    }
-                }
+            //gtsam_quadrics::ConstrainedDualQuadric Q(quadric_pose, radii);
+            
+            if(det->Q_.radii().norm() < 1.0e-3){
+                continue;
             }
-            gtsam::Vector4 bbox_noise_vec(30.0, 30.0, 30.0, 30.0);
-            if(max_iou > 1.0e-5){
-                bbox_noise_vec = bbox_noise_vec * (1.0 / max_iou);
+            
+            gtsam::Pose3 dQw_pose = Twc.transformPoseFrom(dQc_pose);
+            gtsam_quadrics::ConstrainedDualQuadric Q(dQw_pose, dQc.radii());
+            //========IOU TEST=========
+            gtsam_quadrics::AlignedBox2 est_box = quadric_cam.project(Q, gtsam::Pose3(cam_in_map.cast<double>()), K_gtsam).bounds();
+            if(est_box.iou(meas) < 0.15){
+                continue;
             }
-            auto bbox_noise = gtsam::noiseModel::Diagonal::Sigmas(bbox_noise_vec);
-            if(matched){
-                gtsam_quadrics::BoundingBoxFactor bbf(meas, K_gtsam, sensor_id, O(matched_obj->id()), bbox_noise, gtsam_quadrics::BoundingBoxFactor::TRUNCATED);
-                new_factors_.add(bbf);
-                det->setCorrespondence(matched_obj);
-                matched_obj->addDetection(det);
-            }
-            else{
-                gtsam::Pose3 Twc = gtsam::Pose3(cam_in_map.cast<double>());
-                gtsam::Point3 rel_point = det->center3D().cast<double>();
-                gtsam::Point3 quadric_center = Twc.transformFrom(rel_point);
-                double box_depth = rel_point.z();
-                if(box_depth > 5.0 || rel_point.z() < 0){ // too far
-                    continue;
-                }
-                gtsam::Point3 up_vec = Twc.transformFrom(gtsam::Point3(0.0, 1.0, 0.0));
-                gtsam::Rot3 quadric_rotation = gtsam::PinholeCamera<gtsam::Cal3_S2>::Lookat(Twc.translation(), quadric_center, up_vec, *K_gtsam).pose().rotation();
-                
-                gtsam::Pose3 quadric_pose(quadric_rotation, quadric_center);
-                double tx = (meas.xmin() - K_gtsam->px()) * box_depth / K_gtsam->fx();
-                double ty = (meas.ymin() - K_gtsam->py()) * box_depth / K_gtsam->fy();
-                Eigen::Vector3d radii(abs(tx - rel_point.x()), abs(ty - rel_point.y()), 0.1);
-                gtsam_quadrics::ConstrainedDualQuadric Q(quadric_pose, radii);
+            //=========================
 
-                Object* new_obj = new Object(det->getClassName(), last_oid_ == -1 ? 0 : last_oid_ + 1, Q);
-                new_obj->addDetection(det);
-                det->setCorrespondence(new_obj);
-                if(kf->getFloor() == nullptr){
-                    cout<<"NULL FLOOR INSERT"<<endl;
-                }
-                h_graph_.insert(kf->getFloor(), new_obj);
-
-                auto init_obj_noise = gtsam::noiseModel::Diagonal::Sigmas(Eigen::VectorXd::Ones(9));
-                //auto init_obj_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(9) << 0.3, 0.3, 0.3, 1.0, 1.0, 1.0, 0.2, 0.2, 1.0).finished());
-                gtsam::PriorFactor<gtsam_quadrics::ConstrainedDualQuadric> opf(O(new_obj->id()), Q, init_obj_noise);
-                new_values_.insert(O(new_obj->id()), Q);
-                
-                new_factors_.add(opf);
-
-                gtsam_quadrics::BoundingBoxFactor bbf(meas, K_gtsam, sensor_id, O(new_obj->id()), bbox_noise, gtsam_quadrics::BoundingBoxFactor::TRUNCATED);
-                new_factors_.add(bbf);
-                last_oid_ = new_obj->id();
+            Object* new_obj = new Object(det->getClassName(), last_oid_ == -1 ? 0 : last_oid_ + 1, Q);
+            pcl::io::savePCDFile("/home/nuninu98/cloud_test/" + new_obj->getClassName()+to_string(new_obj->id())+".pcd", det->depth_cloud_);
+            new_obj->addDetection(det);
+            det->setCorrespondence(new_obj);
+            if(kf->getFloor() == nullptr){
+                cout<<"NULL FLOOR INSERT"<<endl;
             }
+            h_graph_.insert(kf->getFloor(), new_obj);
+
+            auto init_obj_noise = gtsam::noiseModel::Diagonal::Sigmas(Eigen::VectorXd::Ones(9));
+            //auto init_obj_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(9) << 0.3, 0.3, 0.3, 1.0, 1.0, 1.0, 0.2, 0.2, 1.0).finished());
+            gtsam::PriorFactor<gtsam_quadrics::ConstrainedDualQuadric> opf(O(new_obj->id()), Q, init_obj_noise);
+            new_values_.insert(O(new_obj->id()), Q);
+            
+            new_factors_.add(opf);
+
+            gtsam_quadrics::BoundingBoxFactor bbf(meas, K_gtsam, sensor_id, O(new_obj->id()), bbox_noise, gtsam_quadrics::BoundingBoxFactor::TRUNCATED);
+            new_factors_.add(bbf);
+            last_oid_ = new_obj->id();
+
+            
+        }
         
     }
     
@@ -674,6 +689,7 @@ void SemanticSLAM::visualizeHGraph(visualization_msgs::MarkerArray& output){
     output.markers.clear();
     size_t id = 0;
     vector<Object*> objs = h_graph_.getEveryObjects();
+    vector<geometry_msgs::TransformStamped> tfs;
     for(const auto& obj : objs){
         visualization_msgs::Marker obj_marker;
         obj_marker.type = visualization_msgs::Marker::SPHERE;
@@ -682,19 +698,19 @@ void SemanticSLAM::visualizeHGraph(visualization_msgs::MarkerArray& output){
         obj_marker.header.stamp = ros::Time::now();
         obj_marker.header.frame_id ="map_optic";
         if(obj->getClassName() == "room_sign"){
-            obj_marker.color.a = 1.0;
+            obj_marker.color.a = 0.6;
             obj_marker.color.r = 0.0;
             obj_marker.color.g = 0.0;
             obj_marker.color.b = 255.0;
         }
         else if(obj->getClassName()== "extinguisher"){
-            obj_marker.color.a = 1.0;
+            obj_marker.color.a = 0.6;
             obj_marker.color.r = 255.0;
             obj_marker.color.g = 0.0;
             obj_marker.color.b = 0.0;
         }
         else{
-            obj_marker.color.a = 1.0;
+            obj_marker.color.a = 0.6;
             obj_marker.color.r = 0.0;
             obj_marker.color.g = 255.0;
             obj_marker.color.b = 0.0;
@@ -711,7 +727,18 @@ void SemanticSLAM::visualizeHGraph(visualization_msgs::MarkerArray& output){
         obj_marker.scale.y = obj->Q().radii()(1);
         obj_marker.scale.z = obj->Q().radii()(2);
         output.markers.push_back(obj_marker);
+
+        geometry_msgs::TransformStamped quad_axis;
+        quad_axis.header.frame_id = "map_optic";
+        quad_axis.header.stamp = ros::Time::now();
+        quad_axis.transform.rotation = obj_marker.pose.orientation;
+        quad_axis.transform.translation.x = obj_marker.pose.position.x;
+        quad_axis.transform.translation.y = obj_marker.pose.position.y;
+        quad_axis.transform.translation.z = obj_marker.pose.position.z;
+        quad_axis.child_frame_id= obj->getClassName()+to_string(obj->id());
+        tfs.push_back(quad_axis);
     }
+    broadcaster_.sendTransform(tfs);
     // unordered_set<const ORB_SLAM3::KeyFrame*> keys;
     // size_t id = 0;
     // vector<std_msgs::ColorRGBA> colors(4);

@@ -14,7 +14,7 @@
 #include "KeyFrame.h"
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/segmentation/sac_segmentation.h>
-
+#include <pcl/common/common.h>
 #include <gtsam/geometry/Rot3.h>
 #include <gtsam/geometry/Point3.h>
 #include <gtsam/geometry/Pose3.h>
@@ -64,6 +64,8 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
         
         public: 
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+            pcl::PointCloud<pcl::PointXYZ> depth_cloud_;
+
             Detection();
 
             Detection(const cv::Rect& roi, const cv::Mat& mask, const string& name);
@@ -81,7 +83,6 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
 
             void copyContent(const OCRDetection& ocr_output);
 
-            void calcCentroid(const cv::Mat& color_mat, const cv::Mat& depth_mat, const Eigen::Matrix3f& K);
 
             //void getCloud(pcl::PointCloud<pcl::PointXYZRGB>& output) const;
 
@@ -89,19 +90,21 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
 
             const DetectionGroup* getDetectionGroup() const;
         
-            Eigen::Vector3f center3D() const;
-
             void setCorrespondence(Object* obj);
 
             Object* getCorrespondence() const;
+
+            gtsam_quadrics::ConstrainedDualQuadric Q_;
+            void calcInitQuadric(const cv::Mat& depth_scaled, const cv::Mat& mask, const Eigen::Matrix3f& K);
+
         private:
             Object* matched_obj_ = nullptr;
             cv::Rect roi_;
             cv::Mat mask_;
             string name_;
-            //string content_;
             DetectionGroup* dg_;
-            Eigen::Vector3f centroid_;
+
+            
             
     };
 

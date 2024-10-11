@@ -7,11 +7,12 @@ Panels:
         - /Global Options1
         - /Status1
         - /Grid1
+        - /TF1
         - /PointCloud21
         - /PointCloud22
         - /MarkerArray1
       Splitter Ratio: 0.5
-    Tree Height: 497
+    Tree Height: 489
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -29,7 +30,7 @@ Panels:
   - Class: rviz/Time
     Name: Time
     SyncMode: 0
-    SyncSource: PointCloud2
+    SyncSource: ""
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -86,6 +87,114 @@ Visualization Manager:
       Frame Timeout: 15000
       Frames:
         All Enabled: true
+        Object_0:
+          Value: true
+        Object_1:
+          Value: true
+        Object_10:
+          Value: true
+        Object_11:
+          Value: true
+        Object_12:
+          Value: true
+        Object_13:
+          Value: true
+        Object_14:
+          Value: true
+        Object_15:
+          Value: true
+        Object_16:
+          Value: true
+        Object_17:
+          Value: true
+        Object_18:
+          Value: true
+        Object_19:
+          Value: true
+        Object_2:
+          Value: true
+        Object_20:
+          Value: true
+        Object_21:
+          Value: true
+        Object_22:
+          Value: true
+        Object_23:
+          Value: true
+        Object_24:
+          Value: true
+        Object_25:
+          Value: true
+        Object_26:
+          Value: true
+        Object_27:
+          Value: true
+        Object_28:
+          Value: true
+        Object_29:
+          Value: true
+        Object_3:
+          Value: true
+        Object_30:
+          Value: true
+        Object_31:
+          Value: true
+        Object_32:
+          Value: true
+        Object_33:
+          Value: true
+        Object_34:
+          Value: true
+        Object_35:
+          Value: true
+        Object_36:
+          Value: true
+        Object_37:
+          Value: true
+        Object_38:
+          Value: true
+        Object_39:
+          Value: true
+        Object_4:
+          Value: true
+        Object_40:
+          Value: true
+        Object_41:
+          Value: true
+        Object_42:
+          Value: true
+        Object_43:
+          Value: true
+        Object_44:
+          Value: true
+        Object_45:
+          Value: true
+        Object_46:
+          Value: true
+        Object_47:
+          Value: true
+        Object_48:
+          Value: true
+        Object_49:
+          Value: true
+        Object_5:
+          Value: true
+        Object_50:
+          Value: true
+        Object_51:
+          Value: true
+        Object_52:
+          Value: true
+        Object_53:
+          Value: true
+        Object_6:
+          Value: true
+        Object_7:
+          Value: true
+        Object_8:
+          Value: true
+        Object_9:
+          Value: true
         base_link:
           Value: true
         map:
@@ -95,18 +204,128 @@ Visualization Manager:
       Marker Alpha: 1
       Marker Scale: 1
       Name: TF
-      Show Arrows: true
+      Show Arrows: false
       Show Axes: true
       Show Names: true
       Tree:
+        Object_0:
+          {}
+        Object_1:
+          {}
+        Object_10:
+          {}
+        Object_11:
+          {}
+        Object_12:
+          {}
+        Object_13:
+          {}
+        Object_14:
+          {}
+        Object_15:
+          {}
+        Object_16:
+          {}
+        Object_17:
+          {}
+        Object_18:
+          {}
+        Object_19:
+          {}
+        Object_2:
+          {}
+        Object_20:
+          {}
+        Object_21:
+          {}
+        Object_22:
+          {}
+        Object_23:
+          {}
+        Object_24:
+          {}
+        Object_25:
+          {}
+        Object_26:
+          {}
+        Object_27:
+          {}
+        Object_28:
+          {}
+        Object_29:
+          {}
+        Object_3:
+          {}
+        Object_30:
+          {}
+        Object_31:
+          {}
+        Object_32:
+          {}
+        Object_33:
+          {}
+        Object_34:
+          {}
+        Object_35:
+          {}
+        Object_36:
+          {}
+        Object_37:
+          {}
+        Object_38:
+          {}
+        Object_39:
+          {}
+        Object_4:
+          {}
+        Object_40:
+          {}
+        Object_41:
+          {}
+        Object_42:
+          {}
+        Object_43:
+          {}
+        Object_44:
+          {}
+        Object_45:
+          {}
+        Object_46:
+          {}
+        Object_47:
+          {}
+        Object_48:
+          {}
+        Object_49:
+          {}
+        Object_5:
+          {}
+        Object_50:
+          {}
+        Object_51:
+          {}
+        Object_52:
+          {}
+        Object_53:
+          {}
+        Object_6:
+          {}
+        Object_7:
+          {}
+        Object_8:
+          {}
+        Object_9:
+          {}
+        base_link:
+          {}
         map:
-          map_optic:
-            base_link:
-              {}
+          {}
+        map_optic:
+          {}
       Update Interval: 0
       Value: true
     - Class: rviz/Camera
-      Enabled: true
+      Enabled: false
       Image Rendering: background and overlay
       Image Topic: /d455/color/image_raw
       Name: Camera
@@ -114,7 +333,7 @@ Visualization Manager:
       Queue Size: 2
       Transport Hint: raw
       Unreliable: false
-      Value: true
+      Value: false
       Visibility:
         Grid: true
         MarkerArray: true
@@ -232,7 +451,7 @@ Visualization Manager:
       Marker Topic: /hierarchy_graph
       Name: MarkerArray
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
   Enabled: true
@@ -263,7 +482,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 16.15452766418457
+      Distance: 178.24002075195312
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -271,27 +490,27 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 2.3718225955963135
-        Y: 0.01606796868145466
-        Z: -0.04930577427148819
+        X: 25.573270797729492
+        Y: -0.4486105442047119
+        Z: -0.14142820239067078
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7747970819473267
+      Pitch: 0.025398682802915573
       Target Frame: <Fixed Frame>
-      Yaw: 3.813589096069336
+      Yaw: 0.1985919177532196
     Saved: ~
 Window Geometry:
   Camera:
-    collapsed: false
+    collapsed: true
   Displays:
-    collapsed: false
+    collapsed: true
   Height: 1043
-  Hide Left Dock: false
-  Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000015600000375fc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d0000027c000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000c00430061006d00650072006101000002bf000000f30000001600ffffff000000010000010f00000375fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000003d00000375000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007800000003efc0100000002fb0000000800540069006d0065010000000000000780000003bc00fffffffb0000000800540069006d006501000000000000045000000000000000000000050f0000037500000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Hide Left Dock: true
+  Hide Right Dock: true
+  QMainWindow State: 000000ff00000000fd00000004000000000000015600000375fc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073000000003d00000274000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000c00430061006d00650072006100000002b7000000fb0000001600fffffffb0000001c004600720061006d00650020004300750062006500200049006d0067000000039c000000160000000000000000000000010000010f00000375fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d00000375000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000003c00000003efc0100000002fb0000000800540069006d00650100000000000003c0000003bc00fffffffb0000000800540069006d00650100000000000004500000000000000000000003c00000037500000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -299,7 +518,7 @@ Window Geometry:
   Tool Properties:
     collapsed: false
   Views:
-    collapsed: false
-  Width: 1920
+    collapsed: true
+  Width: 960
   X: 0
   Y: 0
