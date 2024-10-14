@@ -99,7 +99,7 @@ vector<Object*> HGraph::getEveryObjects() const{
     return tmp;
 }
 
-void HGraph::getMatchedKFs(KeyFrame* kf, unordered_map<KeyFrame*, float>& kf_scores, unordered_map<string, float>& obj_score){
+void HGraph::getMatchedKFs(KeyFrame* kf, unordered_map<KeyFrame*, float>& kf_scores){
     Floor* kf_floor = kf->getFloor();
     if(fl_name_objs_.find(kf_floor) == fl_name_objs_.end()){
         return;
@@ -113,9 +113,6 @@ void HGraph::getMatchedKFs(KeyFrame* kf, unordered_map<KeyFrame*, float>& kf_sco
             continue;
         }
         
-        if(obj_score.find(name) == obj_score.end()){
-            obj_score.insert(make_pair(name, 1.0 / name_objs[name].size()));
-        }
         for(const auto& obj : name_objs[name]){
             vector<KeyFrame*> conns;
             obj->getConnectedKeyFrames(conns);
@@ -161,4 +158,15 @@ void HGraph::updateObjectPoses(const gtsam::Values& opt_stats){
             }
         }
     }
+}
+
+float HGraph::getUScore(Floor* floor, string class_name){
+    if(fl_name_objs_.find(floor) == fl_name_objs_.end()){
+        return -1.0;
+    }
+    if(fl_name_objs_[floor].find(class_name) == fl_name_objs_[floor].end()){
+        return -1.0;
+    }
+    return 1.0 / fl_name_objs_[floor][class_name].size();
+
 }

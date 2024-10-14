@@ -54,6 +54,7 @@ find_package(Pangolin REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(PCL 1.8 REQUIRED)
 find_package(OpenMP)
+
 #find_package(gtsam_quadrics REQUIRED)
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -194,6 +195,7 @@ target_link_libraries(semantic_slam_dtype
 add_library(semantic_slam_algorithm
   src/algorithm/landmark_detector.cpp
   src/algorithm/ocr.cpp
+  src/algorithm/loop_matcher.cpp
 )
 target_link_libraries(semantic_slam_algorithm
   ${catkin_LIBRARIES}

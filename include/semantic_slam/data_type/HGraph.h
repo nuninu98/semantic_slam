@@ -31,11 +31,13 @@ class HGraph{
 
         vector<Object*> getEveryObjects() const;
 
-        void getMatchedKFs(KeyFrame* kf, unordered_map<KeyFrame*, float>& kf_scores, unordered_map<string, float>& obj_score);
+        void getMatchedKFs(KeyFrame* kf, unordered_map<KeyFrame*, float>& kf_scores);
     
         vector<Floor*> floors() const;
 
         void updateObjectPoses(const gtsam::Values& opt_stats);
+    
+        float getUScore(Floor* floor, string class_name);
     };
 
 
