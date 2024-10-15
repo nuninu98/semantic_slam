@@ -54,8 +54,7 @@ find_package(Pangolin REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(PCL 1.8 REQUIRED)
 find_package(OpenMP)
-
-#find_package(gtsam_quadrics REQUIRED)
+find_package(ortools REQUIRED)
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
@@ -207,6 +206,7 @@ target_link_libraries(semantic_slam_algorithm
   semantic_slam_dtype
   gtsam
   gtsam_quadrics
+  ortools::ortools
 )
 
 ## Declare a C++ library
