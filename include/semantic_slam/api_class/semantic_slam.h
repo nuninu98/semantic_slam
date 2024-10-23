@@ -27,6 +27,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <semantic_slam/algorithm/landmark_detector.h>
 #include <semantic_slam/algorithm/ocr.h>
+#include <semantic_slam/algorithm/loop_matcher.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <mutex>
@@ -151,6 +152,10 @@ class SemanticSLAM{
         void findSemanticLoopCandidates(KeyFrame* kf, int N, vector<pair<KeyFrame*, float>>& output);
     
         double L1Score(const DBoW2::BowVector &v1, const DBoW2::BowVector &v2) const;
+
+        LoopMatcher loop_matcher_;
+        size_t last_loop_ = 0;
+        Eigen::Matrix4f pose_ = Eigen::Matrix4f::Identity();
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         SemanticSLAM();

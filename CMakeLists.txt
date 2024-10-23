@@ -19,9 +19,9 @@ include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX11)
 CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
 if(COMPILER_SUPPORTS_CXX11)
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
    add_definitions(-DCOMPILEDWITHC11)
-   message(STATUS "Using flag -std=c++14.")
+   message(STATUS "Using flag -std=c++17.")
 elseif(COMPILER_SUPPORTS_CXX0X)
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
    add_definitions(-DCOMPILEDWITHC0X)
@@ -33,6 +33,21 @@ endif()
 set(ORB_SLAM3_DIR
    $ENV{HOME}/ORB_SLAM3_semantic
 )
+set(ORTOOLS_DIR
+  $ENV{HOME}/ortools
+)
+
+# include(FetchContent)
+# FetchContent_Declare(
+#   ortools
+#   GIT_REPOSITORY https://github.com/google/or-tools.git
+#   GIT_TAG        v9.11)
+# set(BUILD_DEPS ON)
+# set(BUILD_DOC OFF)
+# set(BUILD_FLATZINC OFF)
+# set(BUILD_SAMPLES OFF)
+# set(BUILD_EXAMPLES OFF)
+# FetchContent_MakeAvailable(ortools)
 
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
@@ -54,7 +69,7 @@ find_package(Pangolin REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(PCL 1.8 REQUIRED)
 find_package(OpenMP)
-find_package(ortools REQUIRED)
+#find_package(ortools REQUIRED)
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
@@ -170,6 +185,7 @@ include_directories(
   ${OpenCV_INCLUDE_DIRS}
   ${Pangolin_INCLUDE_DIRS}
   ${ORB_SLAM3_DIR}
+  ${ORTOOLS_DIR}/include
   ${ORB_SLAM3_DIR}/include
   ${ORB_SLAM3_DIR}/include/CameraModels
   ${ORB_SLAM3_DIR}/Thirdparty/Sophus
@@ -202,11 +218,11 @@ target_link_libraries(semantic_slam_algorithm
   ${EIGEN3_LIBS}
   ${Pangolin_LIBRARIES}
   ${ORB_SLAM3_DIR}/lib/libORB_SLAM3.so
-  #${ORB_SLAM3_DIR}/lib/libORB_SLAM3_DATA_TYPE.so
   semantic_slam_dtype
   gtsam
   gtsam_quadrics
-  ortools::ortools
+  ${ORTOOLS_DIR}/lib/libortools.so
+  #ortools::ortools
 )
 
 ## Declare a C++ library
