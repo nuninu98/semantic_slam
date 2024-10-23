@@ -23,6 +23,7 @@ HGraph::~HGraph(){
 }
 
 void HGraph::insert(Floor* floor, Object* obj){
+    unique_lock<mutex> lock(lock_);
     if(fl_name_objs_.find(floor) == fl_name_objs_.end()){
         fl_name_objs_.insert(make_pair(floor, unordered_map<string, vector<Object*>>()));
     }
@@ -32,41 +33,49 @@ void HGraph::insert(Floor* floor, Object* obj){
         }
         fl_name_objs_[floor][obj->getClassName()].push_back(obj);
     }
+    // vector<KeyFrame*> conn_kfs;
+    // obj->getConnectedKeyFrames(conn_kfs);
+    // for(auto& k : conn_kfs){
+    //     if(kfs_.find(k->id()) == kfs_.end()){
+    //         kfs_.insert({k->id(), k});
+    //     }
+    // }
     
 }
 
 
 void HGraph::refineObject(){
-    for(auto& fl_map : fl_name_objs_){
-        for(auto& name_objs: fl_map.second){
-            vector<Object*> refined;
-            for(int i = 0; i < name_objs.second.size(); ++i){
-                Object* obj1 = name_objs.second[i];
-                Eigen::Vector3d p1 = obj1->Q().centroid();
-                Object* to_merge = nullptr;
-                double dist_min = 0.5;
-                for(const auto& obj2 : refined){
-                    Eigen::Vector3d p2 = obj2->Q().centroid();
-                    if((p1 - p2).norm() < dist_min){
-                        to_merge = obj2;
-                        dist_min = (p1 - p2).norm();
-                    }
+    // for(auto& fl_map : fl_name_objs_){
+    //     for(auto& name_objs: fl_map.second){
+    //         vector<Object*> refined;
+    //         for(int i = 0; i < name_objs.second.size(); ++i){
+    //             Object* obj1 = name_objs.second[i];
+    //             Eigen::Vector3d p1 = obj1->Q().centroid();
+    //             Object* to_merge = nullptr;
+    //             double dist_min = 0.5;
+    //             for(const auto& obj2 : refined){
+    //                 Eigen::Vector3d p2 = obj2->Q().centroid();
+    //                 if((p1 - p2).norm() < dist_min){
+    //                     to_merge = obj2;
+    //                     dist_min = (p1 - p2).norm();
+    //                 }
                     
-                }
-                if(to_merge == nullptr){
-                    refined.push_back(obj1);
-                }
-                else{ //merge
-                    to_merge->merge(obj1);
-                    delete obj1;
-                }
-            }
-            name_objs.second = refined;
-        }
-    }
+    //             }
+    //             if(to_merge == nullptr){
+    //                 refined.push_back(obj1);
+    //             }
+    //             else{ //merge
+    //                 to_merge->merge(obj1);
+    //                 delete obj1;
+    //             }
+    //         }
+    //         name_objs.second = refined;
+    //     }
+    // }
 }
 
 vector<Object*> HGraph::getObjects(Floor* floor, string obj_name){
+    unique_lock<mutex> lock(lock_);
     vector<Object*> emp;
     if(fl_name_objs_.find(floor) == fl_name_objs_.end()){
         return emp;
@@ -87,7 +96,8 @@ vector<Object*> HGraph::getObjects(Floor* floor, string obj_name){
     return fl_name_objs_[floor][obj_name];
 }
 
-vector<Object*> HGraph::getEveryObjects() const{
+vector<Object*> HGraph::getEveryObjects(){
+    unique_lock<mutex> lock(lock_);
     vector<Object*> tmp;
     for(const auto& fl_name : fl_name_objs_){
         for(const auto& name_objs : fl_name.second){
@@ -100,6 +110,7 @@ vector<Object*> HGraph::getEveryObjects() const{
 }
 
 void HGraph::getMatchedKFs(KeyFrame* kf, unordered_map<KeyFrame*, float>& kf_scores){
+    unique_lock<mutex> lock(lock_);
     Floor* kf_floor = kf->getFloor();
     if(fl_name_objs_.find(kf_floor) == fl_name_objs_.end()){
         return;
@@ -139,7 +150,8 @@ void HGraph::getMatchedKFs(KeyFrame* kf, unordered_map<KeyFrame*, float>& kf_sco
 
 }
 
-vector<Floor*> HGraph::floors() const{
+vector<Floor*> HGraph::floors(){
+    unique_lock<mutex> lock(lock_);
     vector<Floor*> output;
     for(const auto& elem : fl_name_objs_){
         output.push_back(elem.first);
@@ -147,7 +159,8 @@ vector<Floor*> HGraph::floors() const{
     return output;
 }
 
-void HGraph::updateObjectPoses(const gtsam::Values& opt_stats){
+void HGraph::updatePoses(const gtsam::Values& opt_stats){
+    unique_lock<mutex> lock(lock_);
     for(const auto& fl_name : fl_name_objs_){
         for(const auto& name_objs : fl_name.second){
             for(auto& obj : name_objs.second){
@@ -158,9 +171,15 @@ void HGraph::updateObjectPoses(const gtsam::Values& opt_stats){
             }
         }
     }
+    for(auto& elem : kfs_){
+        if(opt_stats.exists(X(elem.second->id()))){
+            elem.second->setPose(opt_stats.at<gtsam::Pose3>(X(elem.second->id())).matrix().cast<float>());
+        }
+    }
 }
 
 float HGraph::getUScore(Floor* floor, string class_name){
+    unique_lock<mutex> lock(lock_);
     if(fl_name_objs_.find(floor) == fl_name_objs_.end()){
         return -1.0;
     }
@@ -168,5 +187,22 @@ float HGraph::getUScore(Floor* floor, string class_name){
         return -1.0;
     }
     return 1.0 / fl_name_objs_[floor][class_name].size();
+}
 
+KeyFrame* HGraph::getKeyFrame(size_t id){
+    unique_lock<mutex> lock(lock_);
+    if(kfs_.find(id) == kfs_.end()){
+        return nullptr;
+    }
+    return kfs_[id];
+}
+
+void HGraph::insert(KeyFrame* kf){
+    unique_lock<mutex> lock(lock_);
+    if(kf == nullptr){
+        return;
+    }
+    if(kfs_.find(kf->id()) == kfs_.end()){
+        kfs_.insert({kf->id(), kf});
+    }
 }

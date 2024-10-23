@@ -42,8 +42,7 @@
 
     void Detection::calcInitQuadric(const cv::Mat& depth_scaled, const cv::Mat& mask, const Eigen::Matrix3f& K){
         cv::Mat depth_masked;
-        depth_scaled.copyTo(depth_masked, mask);
-        
+        depth_scaled.copyTo(depth_masked, mask);        
         pcl::PointCloud<pcl::PointXYZ> cloud;
         vector<pcl::PointXYZ> sort_pt;
         for(int r = roi_.y; r < roi_.y+ roi_.height; ++r){
@@ -132,6 +131,9 @@
 
     void Detection::setCorrespondence(Object* obj){
         matched_obj_ = obj;
+        if(matched_obj_->id() > 1000){
+            cout<<"BAD CORRESPONDENCE"<<endl;
+        }
     }
 
     Object* Detection::getCorrespondence() const{
@@ -168,7 +170,7 @@
     }
     //======================OBJECT==============================
 
-    Object::Object() : id_(0){
+    Object::Object() : id_(0), name_(""){
 
     }
 

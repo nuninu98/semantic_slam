@@ -18,7 +18,7 @@ class LoopMatcher{
 
         ~LoopMatcher();
 
-        bool match(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*,float>>& object_uscores, Eigen::Matrix4f& Ttq_output);
+        bool match(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*,float>>& object_uscores, Eigen::Matrix4f& Ttq_output, vector<pair<Detection*, Object*>>& corr_output);
 };
 
 #endif

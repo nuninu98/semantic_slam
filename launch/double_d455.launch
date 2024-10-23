@@ -3,7 +3,7 @@
     <!-- yolo side-->
 
     <arg name="setting_file" default="$(find semantic_slam)/setting/double_d455.yaml"/>
-    <node name="test_semantic_slam" pkg="semantic_slam" type="test_semantic_slam" output="screen">
+    <node name="test_semantic_slam" pkg="semantic_slam" type="test_semantic_slam" output="screen" >
         <param name="vocabulary_file" value="$(find semantic_slam)/model/ORBvoc.txt"/>
         <param name="setting_file" value="$(arg setting_file)"/>
 

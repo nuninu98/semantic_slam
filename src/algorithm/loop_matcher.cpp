@@ -8,7 +8,8 @@ LoopMatcher::~LoopMatcher(){
 
 }
 
-bool LoopMatcher::match(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*,float>>& object_uscores, Eigen::Matrix4f& Ttq_output){
+bool LoopMatcher::match(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*,float>>& object_uscores, 
+                        Eigen::Matrix4f& Ttq_output, vector<pair<Detection*, Object*>>& corr_output){
     vector<Detection*> dets;
     qkf->getDetections(dets);
     gtsam::NonlinearFactorGraph base_graph;
@@ -25,14 +26,16 @@ bool LoopMatcher::match(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*,
     vector<cv::Mat> test_imgs;
     ros::Time begin = ros::Time::now();
     Eigen::Matrix4d opt_pose = qkf->getPose().cast<double>();
+    vector<pair<int, int>> corrs;
+    bool reliable = false;
     for(int iter = 0; iter < N; ++iter){
+        corrs.clear();
         cv::Mat dg_gray = dets[0]->getDetectionGroup()->gray_.clone();
         cv::Mat gray_color;
         cv::cvtColor(dg_gray, gray_color, cv::COLOR_GRAY2BGR);
         gtsam::NonlinearFactorGraph graph(base_graph);
         gtsam::Values init(base_init);
         init.insert(X(qkf->id()), gtsam::Pose3(opt_pose));
-
         //N(Objects) >= N(Dets)
         vector<vector<float>> costs(dets.size(), vector<float>(object_uscores.size()));
         for(int r = 0; r < costs.size(); ++r){
@@ -84,7 +87,6 @@ bool LoopMatcher::match(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*,
         for(int i = 0; i < x.size(); ++i){
             cp_model.AddExactlyOne(x[i]);
         }
-
         //operations_research::sat::LinearExpr total_cost;
         operations_research::sat::DoubleLinearExpr total_cost;
         for(int i = 0; i < x.size(); ++i){
@@ -107,12 +109,10 @@ bool LoopMatcher::match(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*,
         cout<<"ITER "<<iter<<" COST: "<<result_cost<<endl;
         last_cost = result_cost;
         //vector<pair<Detection*, Object*>> corrs;
-        vector<pair<int, int>> corrs;
+        
         for(int i = 0; i < x.size(); ++i){
             for(int j = 0; j < x[0].size(); ++j){
-                if(operations_research::sat::SolutionBooleanValue(result, x[i][j])){
-                    
-                
+                if(operations_research::sat::SolutionBooleanValue(result, x[i][j])){   
                     const DetectionGroup* dg = dets[i]->getDetectionGroup();
                     Eigen::Matrix3f K = dg->getIntrinsic();
                     gtsam::Cal3_S2::shared_ptr K_gtsam(new gtsam::Cal3_S2(K(0, 0), K(1, 1), 0.0, K(0, 2), K(1, 2)));
@@ -150,12 +150,21 @@ bool LoopMatcher::match(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*,
         gtsam::LevenbergMarquardtOptimizer optim(graph, init);
         gtsam::Values opt = optim.optimize();
         opt_pose = opt.at<gtsam::Pose3>(X(qkf->id())).matrix();
-
-        if(abs(result_cost - last_cost) < 1.0e-4 && last_cost < 1000.0 && iter > 3){
+        if(abs(result_cost - last_cost) < 1.0e-4 && last_cost < 500.0 && iter > 5){
+            reliable = true;
             break;
         }
         
     }
+    if(!reliable){
+        return false;
+    }
+    for(auto& corr : corrs){
+        cout<<"det prev: "<<(dets[corr.first]->getCorrespondence() == nullptr ? "NULL" : to_string(dets[corr.first]->getCorrespondence()->id()))<<endl;
+        cout<<"match corr: "<<(object_uscores[corr.second].first->id())<<endl;
+        corr_output.push_back({dets[corr.first], object_uscores[corr.second].first});
+    }
+
     string folder = "/home/nuninu98/match_test/"+to_string(qkf->id())+"/";
 
     if(!boost::filesystem::exists(folder)){
@@ -165,9 +174,9 @@ bool LoopMatcher::match(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*,
         cv::imwrite(folder + to_string(tkf->id())+"_"+to_string(i)+".png", test_imgs[i]);
     }
     Ttq_output = tkf->getPose().inverse() * opt_pose.cast<float>();
-    cout<<"LOOP "<<qkf->id()<<" <-> "<<tkf->id()<<endl;
-    cout<<"BEF OPT: \n"<<qkf->getPose()<<endl;
-    cout<<"AFT OPT: \n"<<opt_pose<<endl;
+    // cout<<"LOOP "<<qkf->id()<<" <-> "<<tkf->id()<<endl;
+    // cout<<"BEF OPT: \n"<<qkf->getPose()<<endl;
+    // cout<<"AFT OPT: \n"<<opt_pose<<endl;
     cout<<"-----"<<endl;
     return true;
 }

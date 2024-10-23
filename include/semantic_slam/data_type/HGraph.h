@@ -15,7 +15,9 @@ class HGraph{
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     private:
+        mutex lock_;
         unordered_map<Floor*, unordered_map<string, vector<Object*>>> fl_name_objs_;
+        unordered_map<size_t, KeyFrame*> kfs_;
     public:
         HGraph();
 
@@ -29,15 +31,19 @@ class HGraph{
 
         vector<Object*> getObjects(Floor* floor, string obj_name="");
 
-        vector<Object*> getEveryObjects() const;
+        vector<Object*> getEveryObjects();
 
         void getMatchedKFs(KeyFrame* kf, unordered_map<KeyFrame*, float>& kf_scores);
     
-        vector<Floor*> floors() const;
+        vector<Floor*> floors();
 
-        void updateObjectPoses(const gtsam::Values& opt_stats);
+        void updatePoses(const gtsam::Values& opt_stats);
     
         float getUScore(Floor* floor, string class_name);
+    
+        KeyFrame* getKeyFrame(size_t id);
+
+        void insert(KeyFrame* kf);
     };
 
 

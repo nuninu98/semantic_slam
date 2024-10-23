@@ -100,7 +100,7 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     front_depth_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, depth_topic, 1));
     front_yolo_.reset(new message_filters::Subscriber<yolo_protocol::YoloResult> (nh_, rgb_topic+"/yolo", 1));
     front_sync_.reset(new message_filters::Synchronizer<yolo_sync_pol> (yolo_sync_pol(10), *front_depth_, *front_yolo_));
-    front_sync_->registerCallback(boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, _2, Eigen::Matrix4f::Identity(), K_front_, 'F'));
+    front_sync_->registerCallback(boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, _2, Eigen::Matrix4f::Identity(), K_front_, 'X'));
 }
 
 void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image){
@@ -190,14 +190,19 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& dept
     detections.clear();
     for(int i = 0; i < yolo_result->detections.detections.size(); ++i){
         auto detect = yolo_result->detections.detections[i];
-        
+        cv::Rect roi(cv::Point(detect.bbox.center.x- detect.bbox.size_x/2, detect.bbox.center.y - detect.bbox.size_y/2), cv::Size(detect.bbox.size_x, detect.bbox.size_y));
         cv::Mat mask;
-        if(!yolo_result->masks[i].data.empty()){
+        if(!yolo_result->masks.empty()){
             sensor_msgs::ImageConstPtr mask_msg = boost::make_shared<sensor_msgs::Image const>(yolo_result->masks[i]);
             cv_bridge::CvImageConstPtr mask_cv = cv_bridge::toCvShare(mask_msg, "mono8");
             mask = mask_cv->image.clone();
         }
-        cv::Rect roi(cv::Point(detect.bbox.center.x- detect.bbox.size_x/2, detect.bbox.center.y - detect.bbox.size_y/2), cv::Size(detect.bbox.size_x, detect.bbox.size_y));
+        else{
+            mask = cv::Mat::zeros(image.size(), CV_8U);
+            mask(roi) = 255;
+        }
+
+        
         
         cv::Mat img_gray;
         cv::cvtColor(image, img_gray, cv::COLOR_BGR2GRAY);
@@ -427,7 +432,6 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
             //=========================
 
             Object* new_obj = new Object(det->getClassName(), last_oid_ == -1 ? 0 : last_oid_ + 1, Q);
-            // pcl::io::savePCDFile("/home/nuninu98/cloud_test/" + new_obj->getClassName()+to_string(new_obj->id())+".pcd", det->depth_cloud_);
             new_obj->addDetection(det);
             det->setCorrespondence(new_obj);
             if(kf->getFloor() == nullptr){
@@ -451,17 +455,18 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
     
     //gtsam::NonlinearFactorGraph new_conns;
     isam_.update(new_factors_, new_values_);
-    kfs_.insert(make_pair(kf->id(), kf));
+    h_graph_.insert(kf);
+    //kfs_.insert(make_pair(kf->id(), kf));
     new_factors_.resize(0);
     new_values_.clear();
 
     gtsam::Values opt = isam_.calculateEstimate();
     
-    for(auto& elem : kfs_){
-        gtsam::Pose3 opt_pose = opt.at<gtsam::Pose3>(X(elem.first));
-        elem.second->setPose(opt_pose.matrix().cast<float>());
-    }
-    h_graph_.updateObjectPoses(opt);
+    // for(auto& elem : kfs_){
+    //     gtsam::Pose3 opt_pose = opt.at<gtsam::Pose3>(X(elem.first));
+    //     elem.second->setPose(opt_pose.matrix().cast<float>());
+    // }
+    h_graph_.updatePoses(opt);
     
     last_key_ = kf;
 }
@@ -479,10 +484,14 @@ void SemanticSLAM::publishPath(){
     }
 
     for(size_t i = 1; i < last_key_->id(); ++i){
-        if(kfs_.find(i) == kfs_.end()){
+        // if(kfs_.find(i) == kfs_.end()){
+        //     continue;
+        // }
+        //auto k = kfs_[i];
+        auto k = h_graph_.getKeyFrame(i);
+        if(k == nullptr){
             continue;
         }
-        auto k = kfs_[i];
         Eigen::Matrix4f pose = k->getPose() * OPTIC_TF.inverse();
         geometry_msgs::PoseStamped p;
         p.pose.position.x = pose(0, 3);
@@ -565,11 +574,12 @@ void SemanticSLAM::keyframeCallback(){
         visualizeHGraph(h_graph_vis);
         pub_h_graph_.publish(h_graph_vis);
         vector<pair<KeyFrame*, float>> loop_candidates;
-        if(new_kf->id() - last_loop_ > 500){
+        if(new_kf->id() - last_loop_ > 100){
             findSemanticLoopCandidates(new_kf, 3, loop_candidates);
             for(int i = 0; i < loop_candidates.size(); ++i){
                 if(loop_candidates[i].second > 0.3){
                     ORB_SLAM3::LoopQuery lq(ORB_SLAM3::LOOP_TYPE::SEMANTIC ,new_kf->id(), loop_candidates[i].first->id(), Eigen::Matrix4f::Zero());
+                    
                     loop_lock_.lock();
                     lc_buf_.push(lq);
                     loop_lock_.unlock();
@@ -624,18 +634,21 @@ void SemanticSLAM::loopQueryCallback(){
         while(!lc_buf_.empty()){
             ORB_SLAM3::LoopQuery lq = lc_buf_.front();
             if(lq.type == ORB_SLAM3::LOOP_TYPE::BAG_OF_WORDS){
-                if(isam_.valueExists(X(lq.id_query)) && isam_.valueExists(X(lq.id_target)) &&(kfs_[lq.id_query]->getFloor() == kfs_[lq.id_target]->getFloor())){
-                    auto loop_noise_ = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-3, 1e-3, 1e-3, 1e-2, 1e-2, 1e-2).finished());
-                    gtsam::BetweenFactor<gtsam::Pose3> lc((X(lq.id_target)), X(lq.id_query), gtsam::Pose3(lq.drift.cast<double>()), loop_noise_);
-                    gtsam_factors_.add(lc);
-                    new_factors_.add(lc);
-                    last_loop_ = lq.id_query;
-                }
+                // if(isam_.valueExists(X(lq.id_query)) && isam_.valueExists(X(lq.id_target)) &&(kfs_[lq.id_query]->getFloor() == kfs_[lq.id_target]->getFloor())){
+                //     auto loop_noise_ = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-3, 1e-3, 1e-3, 1e-2, 1e-2, 1e-2).finished());
+                //     gtsam::BetweenFactor<gtsam::Pose3> lc((X(lq.id_target)), X(lq.id_query), gtsam::Pose3(lq.drift.cast<double>()), loop_noise_);
+                //     gtsam_factors_.add(lc);
+                //     new_factors_.add(lc);
+                //     last_loop_ = lq.id_query;
+                // }
             }
             else if(lq.type == ORB_SLAM3::LOOP_TYPE::SEMANTIC){
                 vector<Detection*> qry_dets;
-                kfs_[lq.id_query]->getDetections(qry_dets);
-                if(isam_.valueExists(X(lq.id_query)) && isam_.valueExists(X(lq.id_target))){
+                auto qkf = h_graph_.getKeyFrame(lq.id_query);
+                auto tkf = h_graph_.getKeyFrame(lq.id_target);
+                //kfs_[lq.id_query]->getDetections(qry_dets);
+                if(qkf != nullptr && isam_.valueExists(X(lq.id_query)) && isam_.valueExists(X(lq.id_target))){
+                    qkf->getDetections(qry_dets);
                     unordered_set<Object*> obj_used;
                     vector<pair<Object*, float>> object_uscore;
                     vector<Detection*> tgt_dets;
@@ -643,10 +656,14 @@ void SemanticSLAM::loopQueryCallback(){
                     size_t id_begin = lq.id_target >= 500 ? lq.id_target - 500 : 0;
                     size_t id_end = lq.id_target + 500;
                     for(size_t i = id_begin; i < id_end; ++i){
-                        if(kfs_.find(i) != kfs_.end()){
-                            kfs_[i]->getDetections(tgt_dets);
+                        // if(kfs_.find(i) != kfs_.end()){
+                        //     kfs_[i]->getDetections(tgt_dets);
+                        auto kfi = h_graph_.getKeyFrame(i);
+                        if(kfi != nullptr){
+                            kfi->getDetections(tgt_dets);
                             for(auto& elem : tgt_dets){
                                 Object* corr = elem->getCorrespondence();
+                                
                                 if(corr != nullptr){
                                     if(obj_used.find(corr) == obj_used.end()){
                                         object_uscore.push_back(make_pair(corr, h_graph_.getUScore(floor_, elem->getClassName())));
@@ -665,13 +682,24 @@ void SemanticSLAM::loopQueryCallback(){
                     
                     if(object_uscore.size() >= 3 && qry_dets.size() > 3){
                         Eigen::Matrix4f Ttq;
-                        bool loop_matched = loop_matcher_.match(kfs_[lq.id_query],kfs_[lq.id_target] ,object_uscore, Ttq);
+                        vector<pair<Detection*, Object*>> corr_output;
+                        bool loop_matched = loop_matcher_.match(qkf, tkf,object_uscore, Ttq, corr_output);
+                        //bool loop_matched = loop_matcher_.match(kfs_[lq.id_query],kfs_[lq.id_target] ,object_uscore, Ttq, corr_output);
                         if(loop_matched){
                             last_loop_ = lq.id_query;
                             auto loop_noise_ = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-3, 1e-3, 1e-3, 1e-2, 1e-2, 1e-2).finished());
                             gtsam::BetweenFactor<gtsam::Pose3> lc((X(lq.id_target)), X(lq.id_query), gtsam::Pose3(Ttq.cast<double>()), loop_noise_);
                             gtsam_factors_.add(lc);
                             new_factors_.add(lc);
+                            for(const auto& corr : corr_output){
+                                Eigen::Matrix3f K = corr.first->getDetectionGroup()->getIntrinsic();
+                                gtsam::Vector4 bbox_noise_vec(50.0, 50.0, 50.0, 50.0);
+                                auto bbox_noise = gtsam::noiseModel::Diagonal::Sigmas(bbox_noise_vec);
+                                gtsam::Cal3_S2::shared_ptr K_gtsam(new gtsam::Cal3_S2(K(0, 0), K(1, 1), 0.0, K(0, 2), K(1, 2)));
+                                gtsam::Key sensor_id = gtsam::Symbol(corr.first->getDetectionGroup()->sID(), lq.id_query);
+                                gtsam_quadrics::BoundingBoxFactor bbf(corr.first->getROI(), K_gtsam, sensor_id, O(corr.second->id()), bbox_noise, gtsam_quadrics::BoundingBoxFactor::TRUNCATED);
+
+                            }
                         }
                     }
 
@@ -689,11 +717,11 @@ void SemanticSLAM::loopQueryCallback(){
         new_factors_.resize(0);
         //gtsam_factors_.resize(0);
         gtsam::Values opt = isam_.calculateEstimate();
-        for(auto& elem : kfs_){
-            gtsam::Pose3 opt_pose = opt.at<gtsam::Pose3>(X(elem.first));
-            elem.second->setPose(opt_pose.matrix().cast<float>());
-        }
-        h_graph_.updateObjectPoses(opt);
+        // for(auto& elem : kfs_){
+        //     gtsam::Pose3 opt_pose = opt.at<gtsam::Pose3>(X(elem.first));
+        //     elem.second->setPose(opt_pose.matrix().cast<float>());
+        // }
+        h_graph_.updatePoses(opt);
         
         h_graph_.refineObject();
     }

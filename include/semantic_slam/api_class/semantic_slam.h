@@ -135,7 +135,7 @@ class SemanticSLAM{
         KeyFrame* last_key_;
         int last_oid_;
         //Object* last_obj_;
-        unordered_map<size_t, KeyFrame*> kfs_;
+        //unordered_map<size_t, KeyFrame*> kfs_;
         Floor* floor_;
         thread keyframe_thread_, loop_thread_;
         mutex keyframe_lock_;
