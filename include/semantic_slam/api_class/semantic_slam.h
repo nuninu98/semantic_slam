@@ -42,6 +42,7 @@
 #include <semantic_slam/data_type/KeyFrame.h>
 #include <semantic_slam/data_type/HGraph.h>
 #include <yolo_protocol/YoloResult.h>
+#include <pcl/kdtree/kdtree_flann.h>
 #include "System.h"
 #include "LoopQuery.h"
 using namespace std;
@@ -143,8 +144,9 @@ class SemanticSLAM{
         void loopQueryCallback();
         HGraph h_graph_;
 
-        gtsam::Values gtsam_values_, new_values_;// for backup
-        gtsam::NonlinearFactorGraph gtsam_factors_, new_factors_; //for backup
+        mutex gtsam_lock_;
+        gtsam::Values new_values_;// for backup
+        gtsam::NonlinearFactorGraph new_factors_; //for backup
         gtsam::ISAM2 isam_;
         
         void getMapCloud(pcl::PointCloud<pcl::PointXYZRGB>& output);
@@ -156,6 +158,8 @@ class SemanticSLAM{
         LoopMatcher loop_matcher_;
         size_t last_loop_ = 0;
         Eigen::Matrix4f pose_ = Eigen::Matrix4f::Identity();
+
+        void registerObjects(KeyFrame* kf);
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         SemanticSLAM();

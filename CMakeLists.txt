@@ -198,6 +198,7 @@ add_library(semantic_slam_dtype
   src/data_type/DataType.cpp
   src/data_type/HGraph.cpp
   src/data_type/KeyFrame.cpp
+  src/data_type/LoopMatchResult.cpp
 )
 target_link_libraries(semantic_slam_dtype
   ${OpenCV_LIBS} 

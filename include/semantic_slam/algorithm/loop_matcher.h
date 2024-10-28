@@ -9,16 +9,21 @@
 #include <ortools/sat/cp_model_solver.h>
 #include <ros/ros.h>
 #include <boost/filesystem.hpp>
+#include <semantic_slam/data_type/LoopMatchResult.h>
 using namespace std;
 using namespace gtsam::symbol_shorthand;
 
 class LoopMatcher{
+    private:
+        mutex lock_;
     public:
         LoopMatcher();
 
         ~LoopMatcher();
 
-        bool match(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*,float>>& object_uscores, Eigen::Matrix4f& Ttq_output, vector<pair<Detection*, Object*>>& corr_output);
+        // bool match(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*,float>>& object_uscores, Eigen::Matrix4f& Ttq_output, vector<pair<Detection*, Object*>>& corr_output);
+
+        bool match2(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*,float>>& object_uscores, LoopMatchResult& output);
 };
 
 #endif
