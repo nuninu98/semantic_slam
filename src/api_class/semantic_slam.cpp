@@ -737,7 +737,7 @@ void SemanticSLAM::loopQueryCallback(){
                         if(loop_matched){
                             Eigen::Matrix4f diff1 = tkf->getPose().inverse() * qkf->getPose();
                             double diff = (result.drift.inverse() * diff1).block<3, 1>(0, 3).norm();
-                            result.score = diff * result.score;
+                            result.score = diff; //* result.score;
                             result_sorted.push_back(result);
                         }
                     }
@@ -748,10 +748,10 @@ void SemanticSLAM::loopQueryCallback(){
                     return lr1.score < lr2.score;
                 });
                 if(!result_sorted.empty()){
-                    if(result_sorted[0].score > 1000.0){
+                    if(result_sorted[0].score > 10.0){
                         cout<<"DROP"<<endl;
-                        lc_buf_.pop();
-                        continue;
+                        // lc_buf_.pop();
+                        // continue;
                     }
 
                     // if(result_sorted.size() > 2){
