@@ -372,6 +372,7 @@ bool LoopMatcher::match2(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*
 
         if(!is_svd_checked){
             Eigen::MatrixXd dist_mat = Eigen::MatrixXd::Zero(visible_centers.size(), visible_centers.size());
+            Eigen::MatrixXd dist_mat_cpy = dist_mat;
             for(size_t r = 0; r < visible_centers.size(); ++r){
                 for(size_t c = r; c < visible_centers.size(); ++c){
                     dist_mat(r, c) = (visible_centers[r] - visible_centers[c]).norm();
@@ -379,20 +380,24 @@ bool LoopMatcher::match2(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*
                 }
             }
             dist_mat.rowwise().normalize();
+            if(dist_mat.hasNaN()){
+                return false;
+            }
             Eigen::JacobiSVD<Eigen::MatrixXd> svd(dist_mat, Eigen::ComputeFullU | Eigen::ComputeFullV);
+            Eigen::VectorXd singular_vals = svd.singularValues();
             if(last_svals.size() != 0){
-                if(svd.singularValues().hasNaN()){
-                    cout<<"NAN SING"<<endl;
-                }
-                double err = (last_svals - svd.singularValues()).norm();
+                size_t min_size = min(last_svals.size(), singular_vals.size());
+                Eigen::VectorXd crop_last = last_svals.block(0, 0, min_size, 1);
+                Eigen::VectorXd crop_sval = singular_vals.block(0, 0, min_size, 1);
+                double err = (crop_last - crop_sval).norm();
                 cout<<"Singval ERR: "<<err<<endl;
-                if(err > 1.0){
+                if(err > 0.8){
                     return false;
                 }
                 is_svd_checked = true;
-                test_imgs.push_back({gray_color, (last_svals - svd.singularValues()).norm()});
+                test_imgs.push_back({gray_color, err});
             }
-            last_svals = svd.singularValues(); 
+            last_svals = singular_vals; 
         }
                
         // test_imgs.push_back({gray_color, result_cost});
@@ -400,11 +405,8 @@ bool LoopMatcher::match2(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*
         //Loop Query Modify (query, vector of targets)
         //============================
         
-        
-        
-        
-        if(abs(optim.error() - last_cost) < 1.0e-4 && last_cost < 20.0 && iter > 5){
-            reliable = true;
+        if(abs(optim.error() - last_cost) < 1.0e-4 && iter > 3){ //&& last_cost < 20.0 && iter > 5
+            reliable = last_cost < 20.0;
             break;
         }
         last_cost = optim.error();
