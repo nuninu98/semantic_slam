@@ -112,7 +112,7 @@
         Eigen::Affine3f transform3 = transform * transform2;
 
         gtsam::Pose3 pose(transform3.matrix().cast<double>());
-        Q_= gtsam_quadrics::ConstrainedDualQuadric(pose, box_dim.cast<double>());
+        Q_= gtsam_quadrics::ConstrainedDualQuadric(pose, box_dim.cast<double>()/ 2.0);
         // return Q;
     }
 
@@ -319,7 +319,7 @@
         }
         kf->setFloor(this);
         kfs_.push_back(kf);
-        if(kfs_.size() > 500){
+        if(kfs_.size() > 1000){
             kfs_.pop_front();
         }
         refine();
@@ -398,5 +398,9 @@
             cout<<"DIST ERR: "<<dist<<" kf: "<<kf->id()<<endl;
         }
         return res;
+    }
+
+    KeyFrame* Floor::getPlane() const{
+        return plane_kf_;
     }
 

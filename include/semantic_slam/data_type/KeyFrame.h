@@ -17,6 +17,7 @@ class KeyFrame{
         // cv::Mat depth_;
         //===================
     private:
+        mutex mtx_;
         Floor* floor_;
         size_t id_;
         Eigen::Matrix4f pose_;

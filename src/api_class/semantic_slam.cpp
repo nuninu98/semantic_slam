@@ -233,7 +233,7 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& dept
             cv::putText(image, m->getClassName(), m->getROI_CV().tl(), 1, 2, cv::Scalar(0, 0, 255));
         }
     }
-    for(auto& obj : h_graph_.getEveryObjects()){
+    for(auto& obj : h_graph_.getObjects(floor_)){
         gtsam_quadrics::QuadricCamera quadric_cam;
         gtsam::Cal3_S2::shared_ptr K_gtsam(new gtsam::Cal3_S2(K(0, 0), K(1, 1), 0.0, K(0, 2), K(1, 2)));
         Eigen::Matrix4f cam_in_map = pose_* sensor_pose;
@@ -357,6 +357,42 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
             floor_->addKeyFrame(kf);
         }
         else{
+
+            //==============For Debug=============
+            KeyFrame* plane = floor_->getPlane();
+            geometry_msgs::TransformStamped floor_tf;
+            floor_tf.header.stamp = ros::Time::now();
+            floor_tf.header.frame_id = "map_optic";
+            floor_tf.child_frame_id = "floor";
+            floor_tf.transform.translation.x = plane->getPose()(0, 3);
+            floor_tf.transform.translation.y = plane->getPose()(1, 3);
+            floor_tf.transform.translation.z = plane->getPose()(2, 3);
+            Eigen::Quaternionf floor_q(plane->getPose().block<3, 3>(0, 0));
+            floor_tf.transform.rotation.w = floor_q.w();
+            floor_tf.transform.rotation.x = floor_q.x();
+            floor_tf.transform.rotation.y = floor_q.y();
+            floor_tf.transform.rotation.z = floor_q.z();
+
+            geometry_msgs::TransformStamped kf_tf;
+            kf_tf.header.stamp = ros::Time::now();
+            kf_tf.header.frame_id = "map_optic";
+            kf_tf.child_frame_id = "kf";
+            kf_tf.transform.translation.x = kf->getPose()(0, 3);
+            kf_tf.transform.translation.y = kf->getPose()(1, 3);
+            kf_tf.transform.translation.z = kf->getPose()(2, 3);
+            Eigen::Quaternionf kf_q(kf->getPose().block<3, 3>(0, 0));
+            kf_tf.transform.rotation.w = kf_q.w();
+            kf_tf.transform.rotation.x = kf_q.x();
+            kf_tf.transform.rotation.y = kf_q.y();
+            kf_tf.transform.rotation.z = kf_q.z();
+
+            broadcaster_.sendTransform({floor_tf, kf_tf});
+            gtsam::Pose3 plane_se3(plane->getPose().cast<double>());
+            gtsam::Point3 test = kf->getPose().block<3, 1>(0, 3).cast<double>();
+            gtsam::Point3 pt = plane_se3.transformTo(test);
+            cout<<"SURE? "<<pt.transpose()<<endl;
+            //====================================
+
             floor_ = nullptr;
             for(const auto& f : h_graph_.floors()){
                 if(f == nullptr){
@@ -366,6 +402,12 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
                     floor_ = f;
                     break;
                 }
+            }
+            if(floor_ == nullptr){
+                floor_ = new Floor(0, kf);
+                cout<<"Generate Floor"<<endl;
+                kf->setFloor(floor_);
+                h_graph_.insert(floor_);
             }
         }
     }
@@ -453,50 +495,7 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
             }
             gtsam_quadrics::BoundingBoxFactor bbf(meas, K_gtsam, sensor_id, O(matched_obj->id()), bbox_noise, gtsam_quadrics::BoundingBoxFactor::TRUNCATED);
             new_factors_.add(bbf);
-        }
-        // else{
-            
-        //     gtsam_quadrics::ConstrainedDualQuadric dQc = det->Q_;
-        //     gtsam::Pose3 dQc_pose = dQc.pose();
-
-        //     if(dQc_pose.z() > 5.0 || dQc_pose.z() < 0){ // too far
-        //         continue;
-        //     }
-        //     //gtsam_quadrics::ConstrainedDualQuadric Q(quadric_pose, radii);
-            
-        //     if(det->Q_.radii().norm() < 1.0e-3){
-        //         continue;
-        //     }
-            
-        //     gtsam::Pose3 dQw_pose = Twc.transformPoseFrom(dQc_pose);
-        //     gtsam_quadrics::ConstrainedDualQuadric Q(dQw_pose, dQc.radii());
-        //     //========IOU TEST=========
-        //     gtsam_quadrics::AlignedBox2 est_box = quadric_cam.project(Q, gtsam::Pose3(cam_in_map.cast<double>()), K_gtsam).bounds();
-        //     if(est_box.iou(meas) < 0.15){
-        //         continue;
-        //     }
-        //     //=========================
-
-        //     Object* new_obj = new Object(det->getClassName(), last_oid_ == -1 ? 0 : last_oid_ + 1, Q);
-        //     new_obj->addDetection(det);
-        //     det->setCorrespondence(new_obj);
-        //     if(kf->getFloor() == nullptr){
-        //         cout<<"NULL FLOOR INSERT"<<endl;
-        //     }
-        //     h_graph_.insert(kf->getFloor(), new_obj);
-        //     Eigen::VectorXd opf_noise_vec = Eigen::VectorXd::Ones(9);
-        //     auto init_obj_noise = gtsam::noiseModel::Diagonal::Sigmas(opf_noise_vec);
-        //     //auto init_obj_noise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(9) << 0.3, 0.3, 0.3, 1.0, 1.0, 1.0, 0.2, 0.2, 1.0).finished());
-        //     gtsam::PriorFactor<gtsam_quadrics::ConstrainedDualQuadric> opf(O(new_obj->id()), Q, init_obj_noise);
-        //     new_values_.insert(O(new_obj->id()), Q);
-            
-        //     new_factors_.add(opf);
-
-        //     gtsam_quadrics::BoundingBoxFactor bbf(meas, K_gtsam, sensor_id, O(new_obj->id()), bbox_noise, gtsam_quadrics::BoundingBoxFactor::TRUNCATED);
-        //     new_factors_.add(bbf);
-        //     last_oid_ = new_obj->id();
-        // }
-        
+        }  
     }
     
 }
@@ -576,11 +575,16 @@ void SemanticSLAM::keyframeCallback(){
         for(const auto& elem : id_dg){
             detection_groups.push_back(elem.second);
         }
-        KeyFrame* new_kf = new KeyFrame(orb_kf->mnId, orb_kf->GetPoseInverse().matrix());
-        new_kf->bow_vec = orb_kf->mBowVec;
+        
         // new_kf->color_ = orb_kf->color_;
         // new_kf->depth_ = orb_kf->depth_;
         gtsam_lock_.lock();
+        KeyFrame* new_kf = new KeyFrame(orb_kf->mnId, orb_kf->GetPoseInverse().matrix());
+        if(last_key_ != nullptr){
+            Eigen::Matrix4f pose_tmp = last_key_->getPose() * (last_key_->getOdomPose().inverse() * orb_kf->GetPoseInverse().matrix());
+            new_kf->setPose(pose_tmp);
+        }
+        new_kf->bow_vec = orb_kf->mBowVec;
         addKeyFrame(new_kf, detection_groups);
 
         registerObjects(new_kf);
@@ -607,6 +611,11 @@ void SemanticSLAM::keyframeCallback(){
             }
             if(uscore > 0.2){
                 findSemanticLoopCandidates(new_kf, ceil(1.0 / uscore), loop_candidates);
+                cout<<"USCORE: "<<uscore<<endl;
+                for(const auto& d : kf_dets){
+                    cout<<d->getClassName()<<" ";
+                }
+                cout<<endl;
             } 
         }
         

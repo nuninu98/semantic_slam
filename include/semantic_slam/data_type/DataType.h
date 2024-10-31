@@ -211,6 +211,8 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
 
             bool isInlier(KeyFrame* kf);
 
+            KeyFrame* getPlane() const;
+
             
 
     };

@@ -391,7 +391,7 @@ bool LoopMatcher::match2(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*
                 Eigen::VectorXd crop_sval = singular_vals.block(0, 0, min_size, 1);
                 double err = (crop_last - crop_sval).norm();
                 cout<<"Singval ERR: "<<err<<endl;
-                if(err > 0.8){
+                if(err > 0.6){
                     return false;
                 }
                 is_svd_checked = true;

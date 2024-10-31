@@ -12,7 +12,7 @@ Panels:
         - /PointCloud22
         - /MarkerArray1
       Splitter Ratio: 0.5
-    Tree Height: 489
+    Tree Height: 226
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -87,119 +87,203 @@ Visualization Manager:
       Frame Timeout: 15000
       Frames:
         All Enabled: true
-        Object_0:
-          Value: true
-        Object_1:
-          Value: true
-        Object_10:
-          Value: true
-        Object_11:
-          Value: true
-        Object_12:
-          Value: true
-        Object_13:
-          Value: true
-        Object_14:
-          Value: true
-        Object_15:
-          Value: true
-        Object_16:
-          Value: true
-        Object_17:
-          Value: true
-        Object_18:
-          Value: true
-        Object_19:
-          Value: true
-        Object_2:
-          Value: true
-        Object_20:
-          Value: true
-        Object_21:
-          Value: true
-        Object_22:
-          Value: true
-        Object_23:
-          Value: true
-        Object_24:
-          Value: true
-        Object_25:
-          Value: true
-        Object_26:
-          Value: true
-        Object_27:
-          Value: true
-        Object_28:
-          Value: true
-        Object_29:
-          Value: true
-        Object_3:
-          Value: true
-        Object_30:
-          Value: true
-        Object_31:
-          Value: true
-        Object_32:
-          Value: true
-        Object_33:
-          Value: true
-        Object_34:
-          Value: true
-        Object_35:
-          Value: true
-        Object_36:
-          Value: true
-        Object_37:
-          Value: true
-        Object_38:
-          Value: true
-        Object_39:
-          Value: true
-        Object_4:
-          Value: true
-        Object_40:
-          Value: true
-        Object_41:
-          Value: true
-        Object_42:
-          Value: true
-        Object_43:
-          Value: true
-        Object_44:
-          Value: true
-        Object_45:
-          Value: true
-        Object_46:
-          Value: true
-        Object_47:
-          Value: true
-        Object_48:
-          Value: true
-        Object_49:
-          Value: true
-        Object_5:
-          Value: true
-        Object_50:
-          Value: true
-        Object_51:
-          Value: true
-        Object_52:
-          Value: true
-        Object_53:
-          Value: true
-        Object_6:
-          Value: true
-        Object_7:
-          Value: true
-        Object_8:
-          Value: true
-        Object_9:
-          Value: true
         base_link:
+          Value: true
+        chair29:
+          Value: true
+        chair30:
+          Value: true
+        chair31:
+          Value: true
+        chair32:
+          Value: true
+        chair63:
+          Value: true
+        exit38:
+          Value: true
+        exit39:
+          Value: true
+        exit53:
+          Value: true
+        exit55:
+          Value: true
+        exit66:
+          Value: true
+        extinguisher11:
+          Value: true
+        extinguisher12:
+          Value: true
+        extinguisher2:
+          Value: true
+        extinguisher20:
+          Value: true
+        extinguisher21:
+          Value: true
+        extinguisher3:
+          Value: true
+        extinguisher35:
+          Value: true
+        extinguisher36:
+          Value: true
+        extinguisher56:
+          Value: true
+        extinguisher58:
+          Value: true
+        extinguisher61:
           Value: true
         map:
           Value: true
         map_optic:
+          Value: true
+        room_sign0:
+          Value: true
+        room_sign1:
+          Value: true
+        room_sign10:
+          Value: true
+        room_sign11:
+          Value: true
+        room_sign12:
+          Value: true
+        room_sign13:
+          Value: true
+        room_sign14:
+          Value: true
+        room_sign15:
+          Value: true
+        room_sign16:
+          Value: true
+        room_sign17:
+          Value: true
+        room_sign18:
+          Value: true
+        room_sign19:
+          Value: true
+        room_sign2:
+          Value: true
+        room_sign21:
+          Value: true
+        room_sign22:
+          Value: true
+        room_sign23:
+          Value: true
+        room_sign24:
+          Value: true
+        room_sign25:
+          Value: true
+        room_sign26:
+          Value: true
+        room_sign27:
+          Value: true
+        room_sign28:
+          Value: true
+        room_sign29:
+          Value: true
+        room_sign3:
+          Value: true
+        room_sign30:
+          Value: true
+        room_sign31:
+          Value: true
+        room_sign32:
+          Value: true
+        room_sign33:
+          Value: true
+        room_sign34:
+          Value: true
+        room_sign35:
+          Value: true
+        room_sign36:
+          Value: true
+        room_sign37:
+          Value: true
+        room_sign38:
+          Value: true
+        room_sign39:
+          Value: true
+        room_sign4:
+          Value: true
+        room_sign40:
+          Value: true
+        room_sign41:
+          Value: true
+        room_sign42:
+          Value: true
+        room_sign43:
+          Value: true
+        room_sign44:
+          Value: true
+        room_sign45:
+          Value: true
+        room_sign46:
+          Value: true
+        room_sign47:
+          Value: true
+        room_sign48:
+          Value: true
+        room_sign49:
+          Value: true
+        room_sign5:
+          Value: true
+        room_sign50:
+          Value: true
+        room_sign51:
+          Value: true
+        room_sign52:
+          Value: true
+        room_sign53:
+          Value: true
+        room_sign54:
+          Value: true
+        room_sign55:
+          Value: true
+        room_sign56:
+          Value: true
+        room_sign57:
+          Value: true
+        room_sign58:
+          Value: true
+        room_sign6:
+          Value: true
+        room_sign60:
+          Value: true
+        room_sign62:
+          Value: true
+        room_sign64:
+          Value: true
+        room_sign65:
+          Value: true
+        room_sign67:
+          Value: true
+        room_sign68:
+          Value: true
+        room_sign69:
+          Value: true
+        room_sign7:
+          Value: true
+        room_sign70:
+          Value: true
+        room_sign8:
+          Value: true
+        room_sign9:
+          Value: true
+        trashcan40:
+          Value: true
+        trashcan41:
+          Value: true
+        wall_exinguisher19:
+          Value: true
+        wall_exinguisher20:
+          Value: true
+        wall_exinguisher52:
+          Value: true
+        wall_exinguisher54:
+          Value: true
+        wall_exinguisher59:
+          Value: true
+        wall_exinguisher6:
+          Value: true
+        wall_exinguisher7:
           Value: true
       Marker Alpha: 1
       Marker Scale: 1
@@ -208,119 +292,203 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        Object_0:
-          {}
-        Object_1:
-          {}
-        Object_10:
-          {}
-        Object_11:
-          {}
-        Object_12:
-          {}
-        Object_13:
-          {}
-        Object_14:
-          {}
-        Object_15:
-          {}
-        Object_16:
-          {}
-        Object_17:
-          {}
-        Object_18:
-          {}
-        Object_19:
-          {}
-        Object_2:
-          {}
-        Object_20:
-          {}
-        Object_21:
-          {}
-        Object_22:
-          {}
-        Object_23:
-          {}
-        Object_24:
-          {}
-        Object_25:
-          {}
-        Object_26:
-          {}
-        Object_27:
-          {}
-        Object_28:
-          {}
-        Object_29:
-          {}
-        Object_3:
-          {}
-        Object_30:
-          {}
-        Object_31:
-          {}
-        Object_32:
-          {}
-        Object_33:
-          {}
-        Object_34:
-          {}
-        Object_35:
-          {}
-        Object_36:
-          {}
-        Object_37:
-          {}
-        Object_38:
-          {}
-        Object_39:
-          {}
-        Object_4:
-          {}
-        Object_40:
-          {}
-        Object_41:
-          {}
-        Object_42:
-          {}
-        Object_43:
-          {}
-        Object_44:
-          {}
-        Object_45:
-          {}
-        Object_46:
-          {}
-        Object_47:
-          {}
-        Object_48:
-          {}
-        Object_49:
-          {}
-        Object_5:
-          {}
-        Object_50:
-          {}
-        Object_51:
-          {}
-        Object_52:
-          {}
-        Object_53:
-          {}
-        Object_6:
-          {}
-        Object_7:
-          {}
-        Object_8:
-          {}
-        Object_9:
-          {}
         base_link:
+          {}
+        chair29:
+          {}
+        chair30:
+          {}
+        chair31:
+          {}
+        chair32:
+          {}
+        chair63:
+          {}
+        exit38:
+          {}
+        exit39:
+          {}
+        exit53:
+          {}
+        exit55:
+          {}
+        exit66:
+          {}
+        extinguisher11:
+          {}
+        extinguisher12:
+          {}
+        extinguisher2:
+          {}
+        extinguisher20:
+          {}
+        extinguisher21:
+          {}
+        extinguisher3:
+          {}
+        extinguisher35:
+          {}
+        extinguisher36:
+          {}
+        extinguisher56:
+          {}
+        extinguisher58:
+          {}
+        extinguisher61:
           {}
         map:
           {}
         map_optic:
+          {}
+        room_sign0:
+          {}
+        room_sign1:
+          {}
+        room_sign10:
+          {}
+        room_sign11:
+          {}
+        room_sign12:
+          {}
+        room_sign13:
+          {}
+        room_sign14:
+          {}
+        room_sign15:
+          {}
+        room_sign16:
+          {}
+        room_sign17:
+          {}
+        room_sign18:
+          {}
+        room_sign19:
+          {}
+        room_sign2:
+          {}
+        room_sign21:
+          {}
+        room_sign22:
+          {}
+        room_sign23:
+          {}
+        room_sign24:
+          {}
+        room_sign25:
+          {}
+        room_sign26:
+          {}
+        room_sign27:
+          {}
+        room_sign28:
+          {}
+        room_sign29:
+          {}
+        room_sign3:
+          {}
+        room_sign30:
+          {}
+        room_sign31:
+          {}
+        room_sign32:
+          {}
+        room_sign33:
+          {}
+        room_sign34:
+          {}
+        room_sign35:
+          {}
+        room_sign36:
+          {}
+        room_sign37:
+          {}
+        room_sign38:
+          {}
+        room_sign39:
+          {}
+        room_sign4:
+          {}
+        room_sign40:
+          {}
+        room_sign41:
+          {}
+        room_sign42:
+          {}
+        room_sign43:
+          {}
+        room_sign44:
+          {}
+        room_sign45:
+          {}
+        room_sign46:
+          {}
+        room_sign47:
+          {}
+        room_sign48:
+          {}
+        room_sign49:
+          {}
+        room_sign5:
+          {}
+        room_sign50:
+          {}
+        room_sign51:
+          {}
+        room_sign52:
+          {}
+        room_sign53:
+          {}
+        room_sign54:
+          {}
+        room_sign55:
+          {}
+        room_sign56:
+          {}
+        room_sign57:
+          {}
+        room_sign58:
+          {}
+        room_sign6:
+          {}
+        room_sign60:
+          {}
+        room_sign62:
+          {}
+        room_sign64:
+          {}
+        room_sign65:
+          {}
+        room_sign67:
+          {}
+        room_sign68:
+          {}
+        room_sign69:
+          {}
+        room_sign7:
+          {}
+        room_sign70:
+          {}
+        room_sign8:
+          {}
+        room_sign9:
+          {}
+        trashcan40:
+          {}
+        trashcan41:
+          {}
+        wall_exinguisher19:
+          {}
+        wall_exinguisher20:
+          {}
+        wall_exinguisher52:
+          {}
+        wall_exinguisher54:
+          {}
+        wall_exinguisher59:
+          {}
+        wall_exinguisher6:
+          {}
+        wall_exinguisher7:
           {}
       Update Interval: 0
       Value: true
@@ -454,6 +622,30 @@ Visualization Manager:
         {}
       Queue Size: 100
       Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
+      Color: 25; 255; 0
+      Enabled: true
+      Head Diameter: 0.30000001192092896
+      Head Length: 0.20000000298023224
+      Length: 0.30000001192092896
+      Line Style: Lines
+      Line Width: 0.029999999329447746
+      Name: Path
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Queue Size: 10
+      Radius: 0.029999999329447746
+      Shaft Diameter: 0.10000000149011612
+      Shaft Length: 0.10000000149011612
+      Topic: /raw_path
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -482,7 +674,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 178.24002075195312
+      Distance: 104.72817993164062
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -490,17 +682,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 25.573270797729492
-        Y: -0.4486105442047119
-        Z: -0.14142820239067078
+        X: 50.55366897583008
+        Y: 11.83779525756836
+        Z: 6.316621780395508
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.025398682802915573
+      Pitch: 0.17979741096496582
       Target Frame: <Fixed Frame>
-      Yaw: 0.1985919177532196
+      Yaw: 2.933600664138794
     Saved: ~
 Window Geometry:
   Camera:
@@ -510,7 +702,7 @@ Window Geometry:
   Height: 1043
   Hide Left Dock: true
   Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd00000004000000000000015600000375fc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073000000003d00000274000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000c00430061006d00650072006100000002b7000000fb0000001600fffffffb0000001c004600720061006d00650020004300750062006500200049006d0067000000039c000000160000000000000000000000010000010f00000375fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d00000375000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000003c00000003efc0100000002fb0000000800540069006d00650100000000000003c0000003bc00fffffffb0000000800540069006d00650100000000000004500000000000000000000003c00000037500000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000015600000375fc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073000000003d0000016d000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000c00430061006d00650072006100000001b0000002020000001600fffffffb0000001c004600720061006d00650020004300750062006500200049006d0067000000039c000000160000000000000000000000010000010f00000375fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d00000375000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007800000003efc0100000002fb0000000800540069006d0065010000000000000780000003bc00fffffffb0000000800540069006d00650100000000000004500000000000000000000007800000037500000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -519,6 +711,6 @@ Window Geometry:
     collapsed: false
   Views:
     collapsed: true
-  Width: 960
+  Width: 1920
   X: 0
   Y: 0
