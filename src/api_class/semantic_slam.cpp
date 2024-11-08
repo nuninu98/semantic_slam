@@ -101,6 +101,8 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     front_yolo_.reset(new message_filters::Subscriber<yolo_protocol::YoloResult> (nh_, rgb_topic+"/yolo", 1));
     front_sync_.reset(new message_filters::Synchronizer<yolo_sync_pol> (yolo_sync_pol(10), *front_depth_, *front_yolo_));
     front_sync_->registerCallback(boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, _2, Eigen::Matrix4f::Identity(), K_front_, 'X'));
+
+    record_sub_ = nh_.subscribe("record_flag", 1000, &SemanticSLAM::recordCallback, this);
 }
 
 void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image){
@@ -283,6 +285,7 @@ SemanticSLAM::~SemanticSLAM(){
     kill_flag_ = true;
     keyframe_cv_.notify_all();
     visual_odom_->Shutdown();
+    
 }
 
 void SemanticSLAM::registerObjects(KeyFrame* kf){
@@ -586,7 +589,23 @@ void SemanticSLAM::keyframeCallback(){
         }
         new_kf->bow_vec = orb_kf->mBowVec;
         addKeyFrame(new_kf, detection_groups);
-
+        vector<pair<KeyFrame*, float>> loop_candidates;
+        if(new_kf->id() % 10 == 0){
+            
+            vector<Detection*> kf_dets;
+            new_kf->getDetections(kf_dets);
+            float uscore = 0.0;
+            bool full_matched = true;
+            for(const auto& d: kf_dets){
+                uscore = max(uscore, h_graph_.getUScore(floor_, d->getClassName()));
+                if(d->getCorrespondence() == nullptr){
+                    full_matched = false;
+                }
+            }
+            if(uscore > 0.1 && !full_matched){
+                findSemanticLoopCandidates(new_kf, ceil(1.0 / uscore) + 2, loop_candidates);
+            } 
+        }
         registerObjects(new_kf);
         isam_.update(new_factors_, new_values_);
         h_graph_.insert(new_kf);
@@ -601,23 +620,7 @@ void SemanticSLAM::keyframeCallback(){
         kf_updated_ = false;    
         key_lock.unlock();
 
-        vector<pair<KeyFrame*, float>> loop_candidates;
-        if(new_kf->id() % 10 == 0){
-            vector<Detection*> kf_dets;
-            new_kf->getDetections(kf_dets);
-            float uscore = 0.0;
-            for(const auto& d: kf_dets){
-                uscore += h_graph_.getUScore(floor_, d->getClassName());
-            }
-            if(uscore > 0.2){
-                findSemanticLoopCandidates(new_kf, ceil(1.0 / uscore), loop_candidates);
-                cout<<"USCORE: "<<uscore<<endl;
-                for(const auto& d : kf_dets){
-                    cout<<d->getClassName()<<" ";
-                }
-                cout<<endl;
-            } 
-        }
+        
         
         loop_lock_.lock();
         size_t lloop = last_loop_;
@@ -626,12 +629,12 @@ void SemanticSLAM::keyframeCallback(){
             ORB_SLAM3::LoopQuery lq(ORB_SLAM3::LOOP_TYPE::SEMANTIC ,new_kf->id(), 0, Eigen::Matrix4f::Zero());
             for(int i = 0; i < loop_candidates.size(); ++i){
                 //ORB_SLAM3::LoopQuery lq(ORB_SLAM3::LOOP_TYPE::SEMANTIC ,new_kf->id(), loop_candidates[i].first->id(), Eigen::Matrix4f::Zero());
-                lq.candidates.push_back({loop_candidates[i].second, loop_candidates[i].first->id()});
-                loop_lock_.lock();
-                lc_buf_.push(lq);
-                loop_lock_.unlock();
-                loop_cv_.notify_all();
+                lq.candidates.push_back({loop_candidates[i].second, loop_candidates[i].first->id()});    
             }
+            loop_lock_.lock();
+            lc_buf_.push(lq);
+            loop_lock_.unlock();
+            loop_cv_.notify_all();
         }
         
         // if(kfs_.size() % 10 == 0){
@@ -742,13 +745,15 @@ void SemanticSLAM::loopQueryCallback(){
                     
                     if(object_uscore.size() >= 3 && qry_dets.size() > 3){
                         LoopMatchResult result;
-                        bool loop_matched = loop_matcher_.match2(qkf, tkf, object_uscore, result);
+                        //bool loop_matched = loop_matcher_.match2(qkf, tkf, object_uscore, result);
+                        bool loop_matched = loop_matcher_.match3(qkf, tkf, h_graph_, result);
+                        
                         if(loop_matched){
                             Eigen::Matrix4f diff1 = tkf->getPose().inverse() * qkf->getPose();
                             double diff = (result.drift.inverse() * diff1).block<3, 1>(0, 3).norm();
                             //result.score = diff; //* result.score;
                             result_sorted.push_back(result);
-                            break;
+                            //break;
                         }
                     }
 
@@ -1001,7 +1006,6 @@ void SemanticSLAM::findSemanticLoopCandidates(KeyFrame* kf, int N, vector<pair<K
         //return p1.first->id() < p2.first->id();
         return p1.second > p2.second;
     });
-
     pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
     int idx = 0;
     pcl::PointCloud<pcl::PointXYZ>::Ptr kd_input(new pcl::PointCloud<pcl::PointXYZ>());
@@ -1013,7 +1017,7 @@ void SemanticSLAM::findSemanticLoopCandidates(KeyFrame* kf, int N, vector<pair<K
         bool too_close = false;
         for(const auto& pkf_s : output){
             Eigen::Vector3f pkf_trans = pkf_s.first->getPose().block<3, 1>(0, 3);
-            if((kf_trans - pkf_trans).norm() < 10.0){
+            if((kf_trans - pkf_trans).norm() < 3.0){
                 too_close = true;
                 break;
             }
@@ -1092,4 +1096,23 @@ double SemanticSLAM::L1Score(const DBoW2::BowVector &v1, const DBoW2::BowVector 
     score = -score/2.0;
 
     return score; // [0..1]
+}
+
+void SemanticSLAM::recordCallback(const std_msgs::BoolConstPtr& msg){
+    string folder = "/home/nuninu98/";
+
+    if(!boost::filesystem::exists(folder)){
+        boost::filesystem::create_directories(folder);
+    }
+    string filename = "smslam_lcd.txt";
+    ofstream traj_file(folder + filename);
+    for(size_t i = 0; i < last_key_->id(); ++i){
+        auto kf = h_graph_.getKeyFrame(i);
+        if(kf == nullptr){
+            continue;
+        }
+        Eigen::Matrix4f se3 = OPTIC_TF* kf->getPose();
+        traj_file << se3(0, 3)<<" "<<se3(1, 3)<<endl;
+    }
+    cout<<"WRITTEN!"<<endl;
 }

@@ -16,10 +16,10 @@ RawWrapper::RawWrapper(): pnh_("~"), kf_updated_(false), kill_flag_(false), thre
 
     visual_odom_ = new ORB_SLAM3::System(voc_file, setting_file ,ORB_SLAM3::System::RGBD, false);
     visual_odom_->registerKeyframeCall(&kf_updated_, &keyframe_cv_);
-
+    visual_odom_->registerLoopCall(&lc_buf_, &loop_cv_, &loop_lock_);
     pub_path_ = nh_.advertise<nav_msgs::Path>("raw_path", 1);
 
-     string rgb_topic, depth_topic, imu_topic;
+    string rgb_topic, depth_topic, imu_topic;
     pnh_.param<string>("rgb_topic", rgb_topic, "/camera/color/image_raw");
     pnh_.param<string>("depth_topic", depth_topic, "/camera/aligned_depth_to_color/image_raw");
     pnh_.param<string>("imu_topic", imu_topic, "/imu/data");
@@ -27,10 +27,18 @@ RawWrapper::RawWrapper(): pnh_("~"), kf_updated_(false), kill_flag_(false), thre
     keyframe_thread_ = thread(&RawWrapper::keyframeCallback, this);
     keyframe_thread_.detach();
 
+    loop_thread_ = thread(&RawWrapper::loopQueryCallback, this);
+    loop_thread_.detach();
+
+    sub_yolo_  = nh_.subscribe("/side/color/image_raw/yolo", 1, &RawWrapper::detectionImageCallback, this);
+
     tracking_color_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, rgb_topic, 1));
     tracking_depth_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, depth_topic, 1));
     tracking_sync_.reset(new message_filters::Synchronizer<sync_pol> (sync_pol(1000), *tracking_color_, *tracking_depth_));
     tracking_sync_->registerCallback(boost::bind(&RawWrapper::trackingImageCallback, this, _1, _2));
+    record_sub_ = nh_.subscribe("record_flag", 1000, &RawWrapper::recordCallback, this);
+    ocr_.reset(new OCR("/home/nuninu98/Downloads/crnn_cs.onnx", "/home/nuninu98/Downloads/alphabet_94.txt"));
+
 }
 
 RawWrapper::~RawWrapper(){
@@ -106,7 +114,94 @@ void RawWrapper::keyframeCallback(){
             path.poses.push_back(p);
         }
         pub_path_.publish(path);
+        detection_lock_.lock();
+        string room_number = "";
+        if((ros::Time::now() - det_stamp_).toSec() < 0.1){
+            room_number = det_.getClassName();
+            size_t kf_id = keyframes.back()->mnId;
+            kfID_room_.insert({kf_id, room_number});
+            kfID_images_.insert({kf_id, det_image_});
+        }
+        
+        detection_lock_.unlock();
         kf_updated_ = false;
 
     }
+}
+
+void RawWrapper::loopQueryCallback(){
+     while(true){
+        unique_lock<mutex> loop_lock(loop_lock_);
+        loop_cv_.wait(loop_lock, [this]{return !this->lc_buf_.empty() || this->kill_flag_;});
+        if(kill_flag_){
+            thread_killed_ = true;
+            break;
+        }
+        while(!lc_buf_.empty()){
+            ORB_SLAM3::LoopQuery lq = lc_buf_.front();
+            if(lq.type == ORB_SLAM3::LOOP_TYPE::BAG_OF_WORDS){
+                if(kfID_room_[lq.id_query] != kfID_room_[lq.id_target] && (!kfID_room_[lq.id_query].empty() && !kfID_room_[lq.id_target].empty())){
+                    cout<<"DIFF ROOM: "<<kfID_room_[lq.id_query]<<" "<<kfID_room_[lq.id_target]<<endl;
+                    string folder = "/home/nuninu98/test_orbloop/"+to_string(lq.id_query)+"/";
+                    if(!boost::filesystem::exists(folder)){
+                        boost::filesystem::create_directories(folder);
+                    }
+                    cv::Mat match_image;
+                    cv::drawMatches(kfID_images_[lq.id_query], vector<cv::KeyPoint>(), kfID_images_[lq.id_target], vector<cv::KeyPoint>(), vector<cv::DMatch>(), match_image);
+                    string filename = folder + to_string(lq.id_query)+"_"+to_string(lq.id_target)+"_number_match";
+                    cv::imwrite(filename+".png", match_image);
+                }
+            }
+            
+            lc_buf_.pop();
+            
+        }
+    }
+}
+
+void RawWrapper::detectionImageCallback(const yolo_protocol::YoloResultConstPtr& yolo_result){
+    unique_lock<mutex> lock(detection_lock_);
+    for(int i = 0; i < yolo_result->detections.detections.size(); ++i){
+        sensor_msgs::ImageConstPtr color_img = boost::make_shared<sensor_msgs::Image const>(yolo_result->original);
+    cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(color_img, "bgr8");
+        cv::Mat image = cv_rgb_bridge->image.clone();
+
+        auto detect = yolo_result->detections.detections[i];
+        cv::Rect roi(cv::Point(detect.bbox.center.x- detect.bbox.size_x/2, detect.bbox.center.y - detect.bbox.size_y/2), cv::Size(detect.bbox.size_x, detect.bbox.size_y));
+        cv::Mat mask;
+        
+        if(detect.header.frame_id == "room_number"){
+            OCRDetection text_out;
+            bool found_txt = ocr_->textRecognition(image, roi, text_out);
+            if(found_txt){
+                // cv::rectangle(image, roi, cv::Scalar(0, 0, 255), 2);
+                // cv::putText(image, m->getClassName(), roi.tl(), 1, 2, cv::Scalar(0, 0, 255));
+                det_ = Detection(roi, cv::Mat(), text_out.getContent());
+                det_stamp_ = ros::Time::now();
+                det_image_ = image;
+                break;
+            }
+        }
+    }
+    
+}
+
+void RawWrapper::recordCallback(const std_msgs::BoolConstPtr& msg){
+    string folder = "/home/nuninu98/";
+
+    if(!boost::filesystem::exists(folder)){
+        boost::filesystem::create_directories(folder);
+    }
+    string filename = "orbslam.txt";
+    ofstream traj_file(folder + filename);
+    vector<ORB_SLAM3::KeyFrame*> keyframes = visual_odom_->getKeyFrames();
+    sort(keyframes.begin(), keyframes.end(), []( ORB_SLAM3::KeyFrame* k1,  ORB_SLAM3::KeyFrame* k2){
+        return k1->mnId < k2->mnId;
+    });
+    for(size_t i = 0; i < keyframes.size(); ++i){
+        
+        Eigen::Matrix4f se3 = OPTIC_TF* keyframes[i]->GetPoseInverse().matrix();
+        traj_file << se3(0, 3)<<" "<<se3(1, 3)<<endl;
+    }
+    cout<<"WRITTEN!"<<endl;
 }

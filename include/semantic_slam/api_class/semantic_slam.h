@@ -45,6 +45,7 @@
 #include <pcl/kdtree/kdtree_flann.h>
 #include "System.h"
 #include "LoopQuery.h"
+#include <std_msgs/Bool.h>
 using namespace std;
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, yolo_protocol::YoloResult> yolo_sync_pol;
@@ -72,7 +73,6 @@ class SemanticSLAM{
         shared_ptr< message_filters::Synchronizer<yolo_sync_pol>> front_sync_;
         //============Test yolov8 seg=============
         ros::Subscriber sub_frontcam_;
-
         //========================================
         vector<cv::Scalar> colors_;
         shared_ptr<LandmarkDetector> door_detector_;
@@ -160,6 +160,9 @@ class SemanticSLAM{
         Eigen::Matrix4f pose_ = Eigen::Matrix4f::Identity();
 
         void registerObjects(KeyFrame* kf);
+
+        ros::Subscriber record_sub_;
+        void recordCallback(const std_msgs::BoolConstPtr& msg);
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         SemanticSLAM();

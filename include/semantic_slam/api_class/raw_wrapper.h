@@ -41,8 +41,11 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <semantic_slam/data_type/KeyFrame.h>
 #include <semantic_slam/data_type/HGraph.h>
-
+#include <yolo_protocol/YoloResult.h>
+#include <std_msgs/Bool.h>
 #include "System.h"
+#include "LoopQuery.h"
+
 using namespace std;
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
 
@@ -51,6 +54,7 @@ class RawWrapper{
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     private:
         Eigen::Matrix4f OPTIC_TF = (Eigen::Matrix4f()<< 0, 0, 1, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 1).finished();
+        shared_ptr<OCR> ocr_;
 
         ros::NodeHandle nh_;
         ros::NodeHandle pnh_;
@@ -72,6 +76,26 @@ class RawWrapper{
         void trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image);
 
         ros::Publisher pub_path_;
+
+        
+        ros::Subscriber sub_yolo_;
+
+        mutex detection_lock_;
+        ros::Time det_stamp_ = ros::Time(0);
+        Detection det_;
+        cv::Mat det_image_;
+        unordered_map<size_t, string> kfID_room_;
+        unordered_map<size_t, cv::Mat> kfID_images_;
+        void detectionImageCallback(const yolo_protocol::YoloResultConstPtr& yolo_result);
+    
+        thread loop_thread_;
+        mutex loop_lock_;
+        queue<ORB_SLAM3::LoopQuery> lc_buf_;
+        condition_variable loop_cv_;
+        void loopQueryCallback();
+
+        ros::Subscriber record_sub_;
+        void recordCallback(const std_msgs::BoolConstPtr& msg);
     public:
         RawWrapper();
 
