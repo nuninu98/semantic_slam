@@ -205,10 +205,7 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& dept
         }
 
         
-        
-        cv::Mat img_gray;
-        cv::cvtColor(image, img_gray, cv::COLOR_BGR2GRAY);
-        if(detect.header.frame_id == "desk"){ //temporarily disabled
+                if(detect.header.frame_id == "desk"){ //temporarily disabled
             continue;
         }
         Detection* det_p = new Detection(roi, cv::Mat(), detect.header.frame_id);
@@ -250,11 +247,9 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& dept
         cv::putText(image, obj->getClassName()+to_string(obj->id()), est_rect.tl(),1, 1, cv::Scalar(255, 255, 255));
     }
    
-    cv::Mat Gray;
-    cv::cvtColor(cv_rgb_bridge->image.clone(), Gray, cv::COLOR_BGR2GRAY);
     if(!detections.empty()){
         DetectionGroup dg(sensor_pose, detections, K, yolo_result->header.stamp.toSec(), sID);
-        dg.gray_ = Gray.clone();
+        dg.view_ = cv_rgb_bridge->image.clone();
         object_lock_.lock();
         obj_detection_buf_.push(dg);
         object_lock_.unlock();
@@ -323,9 +318,6 @@ void SemanticSLAM::registerObjects(KeyFrame* kf){
         Object* new_obj = new Object(det->getClassName(), last_oid_ == -1 ? 0 : last_oid_ + 1, Q);
         new_obj->addDetection(det);
         det->setCorrespondence(new_obj);
-        if(kf->getFloor() == nullptr){
-            cout<<"NULL FLOOR INSERT"<<endl;
-        }
         h_graph_.insert(kf->getFloor(), new_obj);
         Eigen::VectorXd opf_noise_vec = Eigen::VectorXd::Ones(9);
         auto init_obj_noise = gtsam::noiseModel::Diagonal::Sigmas(opf_noise_vec);
@@ -595,13 +587,18 @@ void SemanticSLAM::keyframeCallback(){
             vector<Detection*> kf_dets;
             new_kf->getDetections(kf_dets);
             float uscore = 0.0;
+            //float unmatch_rate = 0.0;
             bool full_matched = true;
             for(const auto& d: kf_dets){
                 uscore = max(uscore, h_graph_.getUScore(floor_, d->getClassName()));
                 if(d->getCorrespondence() == nullptr){
+                    //unmatch_rate += 1.0 / (kf_dets.size());
                     full_matched = false;
                 }
             }
+            // if(uscore > 0.1 && unmatch_rate > 0.5){
+            //     findSemanticLoopCandidates(new_kf, ceil(1.0 / uscore) + 2, loop_candidates);
+            // }
             if(uscore > 0.1 && !full_matched){
                 findSemanticLoopCandidates(new_kf, ceil(1.0 / uscore) + 2, loop_candidates);
             } 

@@ -115,7 +115,7 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
             size_t id_;
             //Eigen::Vector3f centroid_;
             string name_;
-            vector<const Detection*> seens_;
+            vector<Detection*> seens_;
             gtsam_quadrics::ConstrainedDualQuadric Q_;
         public:
             Object();
@@ -130,7 +130,7 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
 
             // void getCloud(pcl::PointCloud<pcl::PointXYZRGB>& output) const;
         
-            void addDetection(const Detection* det);
+            void addDetection(Detection* det);
         
             void getConnectedKeyFrames(vector<KeyFrame*>& output) const;
         
@@ -154,7 +154,7 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
         
         public:
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW      
-            cv::Mat gray_;
+            cv::Mat view_;
         private:
             double stamp_;
             // cv::Mat color_img;

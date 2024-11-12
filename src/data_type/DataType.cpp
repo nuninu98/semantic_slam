@@ -185,9 +185,10 @@
         return name_;
     }
 
-    void Object::addDetection(const Detection* det){
+    void Object::addDetection(Detection* det){
         seens_.push_back(det);
     }
+
 
     void Object::getConnectedKeyFrames(vector<KeyFrame*>& output) const{
         output.clear();
@@ -195,21 +196,6 @@
             output.push_back(s->getDetectionGroup()->getKeyFrame());
         }
     }
-
-    // Eigen::Vector3f Object::getCentroid() const{
-    //     // Eigen::Vector3f centroid;
-    //     // pcl::PointCloud<pcl::PointXYZRGB> cloud;
-    //     // getCloud(cloud);
-
-    //     // pcl::PointXYZRGB cent;
-    //     // pcl::computeCentroid(cloud, cent);
-
-    //     // centroid(0) = cent.x;
-    //     // centroid(1) = cent.y;
-    //     // centroid(2) = cent.z;
-    //     // return centroid;
-    //     return centroid_;
-    // }
 
     size_t Object::id() const{
         return id_;
@@ -232,7 +218,7 @@
     //=====================DetectionGroup================
     DetectionGroup::DetectionGroup(){}
 
-    DetectionGroup::DetectionGroup(const DetectionGroup& dg) : sensor_pose_(dg.sensor_pose_), detections_(dg.detections_), K_(dg.K_), stamp_(dg.stamp_), kf_(dg.kf_), sid_(dg.sid_), gray_(dg.gray_){
+    DetectionGroup::DetectionGroup(const DetectionGroup& dg) : sensor_pose_(dg.sensor_pose_), detections_(dg.detections_), K_(dg.K_), stamp_(dg.stamp_), kf_(dg.kf_), sid_(dg.sid_), view_(dg.view_){
         for(auto& elem : detections_){
             elem->setDetectionGroup(this);
         }
@@ -288,7 +274,7 @@
         stamp_ = dg.stamp_;
         kf_ =dg.kf_;
         sid_ = dg.sid_;
-        gray_ = dg.gray_;
+        view_ = dg.view_;
         //sensor_pose_ = dg.sensor_pose_;
         for(auto& elem : detections_){
             elem->setDetectionGroup(this);

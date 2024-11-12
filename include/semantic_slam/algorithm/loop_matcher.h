@@ -22,7 +22,7 @@ class LoopMatcher{
 
         bool matchStep1(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, Eigen::Matrix4d& opt_pose, vector<pair<Detection*, Object*>>& unique_matches);
 
-        bool matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, const vector<pair<Detection*, Object*>>& unique_matches, Eigen::Matrix4d& opt_pose, double& score);
+        bool matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, const vector<pair<Detection*, Object*>>& unique_matches, Eigen::Matrix4d& opt_pose, double& score, vector<pair<Detection*, Object*>>& match_output);
     
         bool patternMatched( unordered_map<Object*, gtsam_quadrics::AlignedBox2>& visible1, unordered_map<Object*, gtsam_quadrics::AlignedBox2>& visible2);
     

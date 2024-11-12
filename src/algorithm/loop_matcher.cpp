@@ -118,9 +118,7 @@ bool LoopMatcher::match2(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*
     bool is_svd_checked = false;
     for(int iter = 0; iter < N; ++iter){
         corrs.clear();
-        cv::Mat dg_gray = dets[0]->getDetectionGroup()->gray_.clone();
-        cv::Mat gray_color;
-        cv::cvtColor(dg_gray, gray_color, cv::COLOR_GRAY2BGR);
+        cv::Mat dg_view = dets[0]->getDetectionGroup()->view_.clone();
         gtsam::NonlinearFactorGraph graph(base_graph);
         gtsam::Values init(base_init);
         init.insert(X(qkf->id()), gtsam::Pose3(opt_pose));
@@ -146,11 +144,11 @@ bool LoopMatcher::match2(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*
                     double A2 = dets[i]->getROI().width() * dets[i]->getROI().height();
                     double cost = (bbox_est.center() - dets[i]->getROI().center()).norm() * abs(A1- A2)/A2;
                     corrs.push_back(make_pair(i, j));
-                    cv::rectangle(gray_color, est_cv, cv::Scalar(0, 255, 0)); //green. est detection
-                    cv::putText(gray_color, to_string(corrs.size()), est_cv.tl(), 1, 2, cv::Scalar(0, 255, 0));
+                    cv::rectangle(dg_view, est_cv, cv::Scalar(0, 255, 0)); //green. est detection
+                    cv::putText(dg_view, to_string(corrs.size()), est_cv.tl(), 1, 2, cv::Scalar(0, 255, 0));
 
-                    cv::rectangle(gray_color, dets[i]->getROI_CV(), cv::Scalar(0, 0, 255)); //red. actual detection
-                    cv::putText(gray_color, to_string(corrs.size()), dets[i]->getROI_CV().tl(), 1, 2, cv::Scalar(0, 0, 255));
+                    cv::rectangle(dg_view, dets[i]->getROI_CV(), cv::Scalar(0, 0, 255)); //red. actual detection
+                    cv::putText(dg_view, to_string(corrs.size()), dets[i]->getROI_CV().tl(), 1, 2, cv::Scalar(0, 0, 255));
                     break;
                 }
                 visible_centers.push_back(bbox_est.center());
@@ -166,7 +164,7 @@ bool LoopMatcher::match2(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*
                 }
                 gtsam_quadrics::AlignedBox2 bbox_est = qcam.project(object_uscores[j].first->Q(), gtsam::Pose3(Twc), K_gtsam).bounds();
                 cv::Rect est_cv = cv::Rect(bbox_est.xmin(), bbox_est.ymin(), bbox_est.width(), bbox_est.height()) & cv::Rect(0, 0, 1280, 720);
-                cv::rectangle(gray_color, est_cv, cv::Scalar(255, 0, 0)); //blue. est detection
+                cv::rectangle(dg_view, est_cv, cv::Scalar(255, 0, 0)); //blue. est detection
             }
         }
         for(const auto& cor : corrs){
@@ -209,12 +207,11 @@ bool LoopMatcher::match2(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*
                     return false;
                 }
                 is_svd_checked = true;
-                test_imgs.push_back({gray_color, err});
+                test_imgs.push_back({dg_view, err});
             }
             last_svals = singular_vals; 
         }
                
-        // test_imgs.push_back({gray_color, result_cost});
         //==========TODO==============
         //Loop Query Modify (query, vector of targets)
         //============================
@@ -268,7 +265,6 @@ bool LoopMatcher::matchStep1(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, Eige
         dets_sort.push_back({qkf_dets[i], h_graph.getUScore(qkf->getFloor(), qkf_dets[i]->getClassName())});
     }
     if(dets_sort.empty()){
-        cout<<"AA"<<endl;
         return false;
     }
     sort(dets_sort.begin(), dets_sort.end(), [](const pair<Detection*, float>& p1, const pair<Detection*, float>& p2){
@@ -299,9 +295,9 @@ bool LoopMatcher::matchStep1(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, Eige
             tkf_objects.push_back(tkf_dets[i]->getCorrespondence());
         }
     }
-    cv::Mat qkf_gray;
-    cv::Mat tkf_gray;
     double err = 0.0;
+    cv::Mat qkf_view, tkf_view;
+    cv::Mat qkf_view_prev, qkf_view_aft; 
     for(int iter = 0; iter < 1; iter++){
         operations_research::sat::CpModelBuilder cp_model;
         vector<vector<operations_research::sat::BoolVar>> x(dets_unique.size(), vector<operations_research::sat::BoolVar>(tkf_objects.size()));
@@ -355,37 +351,31 @@ bool LoopMatcher::matchStep1(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, Eige
         cp_model.Minimize(total_cost);
         operations_research::sat::CpSolverResponse result = operations_research::sat::Solve(cp_model.Build());
         if(result.status() == operations_research::sat::CpSolverStatus::INFEASIBLE){
-            cout<<"BB"<<endl;
             return false;
         }
         double result_cost = result.objective_value();
 
         if(result_cost < 1.0e-8 || result_cost > 1.0e8){ // temporarily block error. 
-            cout<<"CC. COST: "<<result_cost<<endl;
             return false;
         }
 
         //For Debug
-        cv::Mat dg_gray = qkf_dets[0]->getDetectionGroup()->gray_.clone();
-        
-        cv::cvtColor(dg_gray, qkf_gray, cv::COLOR_GRAY2BGR);
+        qkf_view = qkf_dets[0]->getDetectionGroup()->view_.clone();
+        tkf_view = tkf_dets[0]->getDetectionGroup()->view_.clone();
 
-        
-        dg_gray = tkf_dets[0]->getDetectionGroup()->gray_.clone();
-        cv::cvtColor(dg_gray, tkf_gray, cv::COLOR_GRAY2BGR);
         vector<pair<int, int>> corrs;
         for(int j = 0; j < x[0].size(); ++j){
             for(int i = 0; i < x.size(); ++i){
                 if(operations_research::sat::SolutionBooleanValue(result, x[i][j])){   
                     corrs.push_back(make_pair(i, j));
                     unique_matches.push_back({dets_unique[i].first, tkf_objects[j]});
-                    cv::rectangle(qkf_gray, dets_unique[i].first->getROI_CV(), cv::Scalar(0, 0, 255));
-                    cv::putText(qkf_gray, to_string(corrs.size()), dets_unique[i].first->getROI_CV().tl(), 1, 2, cv::Scalar(0, 0, 255));
+                    cv::rectangle(qkf_view, dets_unique[i].first->getROI_CV(), cv::Scalar(0, 0, 255), 2);
+                    cv::putText(qkf_view, to_string(corrs.size()), dets_unique[i].first->getROI_CV().tl(), 1, 2, cv::Scalar(0, 0, 255), 2);
 
                     for(const auto& elem : tkf_dets){
                         if(elem->getCorrespondence() == tkf_objects[j]){
-                            cv::rectangle(tkf_gray, elem->getROI_CV(), cv::Scalar(0, 0, 255));
-                            cv::putText(tkf_gray, to_string(corrs.size()), elem->getROI_CV().tl(), 1, 2, cv::Scalar(0, 0, 255));
+                            cv::rectangle(tkf_view, elem->getROI_CV(), cv::Scalar(0, 0, 255), 2);
+                            cv::putText(tkf_view, to_string(corrs.size()), elem->getROI_CV().tl(), 1, 2, cv::Scalar(0, 0, 255), 2);
                             break;
                         }
                     }
@@ -409,22 +399,8 @@ bool LoopMatcher::matchStep1(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, Eige
             gtsam_quadrics::BoundingBoxFactor bbf(dets_unique[cor.first].first->getROI(), K_gtsam, X(qkf->id()), O(tkf_objects[cor.second]->id()), bbox_noise);
             graph.add(bbf);
         }
-        
-        gtsam::LevenbergMarquardtOptimizer optim(graph, init);
-        gtsam::Values opt = optim.optimize();
-        opt_pose = opt.at<gtsam::Pose3>(X(qkf->id())).matrix();
-        err = optim.error();
 
-        //-------Debug---------
-        for(const auto& cor : corrs){
-            const DetectionGroup* dg = dets_unique[cor.first].first->getDetectionGroup();
-            Eigen::Matrix3f K = dg->getIntrinsic();
-            gtsam::Cal3_S2::shared_ptr K_gtsam(new gtsam::Cal3_S2(K(0, 0), K(1, 1), 0.0, K(0, 2), K(1, 2)));
-            gtsam_quadrics::QuadricCamera qcam;
-            gtsam_quadrics::AlignedBox2 bbox_est = qcam.project(tkf_objects[cor.second]->Q(), gtsam::Pose3(opt_pose), K_gtsam).bounds();
-            cv::Rect est_cv = cv::Rect(bbox_est.xmin(), bbox_est.ymin(), bbox_est.width(), bbox_est.height()) & cv::Rect(0, 0, 1280, 720);
-            cv::rectangle(qkf_gray, est_cv, cv::Scalar(0, 255, 0));
-        }
+        qkf_view_prev = qkf_dets[0]->getDetectionGroup()->view_.clone();
         for(const auto& obj : h_graph.getObjects(qkf->getFloor())){
             const DetectionGroup* dg = qkf_dets[0]->getDetectionGroup();
             Eigen::Matrix3f K = dg->getIntrinsic();
@@ -435,7 +411,27 @@ bool LoopMatcher::matchStep1(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, Eige
             gtsam_quadrics::QuadricCamera qcam;
             gtsam_quadrics::AlignedBox2 bbox_est = qcam.project(obj->Q(), gtsam::Pose3(opt_pose), K_gtsam).bounds();
             cv::Rect est_cv = cv::Rect(bbox_est.xmin(), bbox_est.ymin(), bbox_est.width(), bbox_est.height()) & cv::Rect(0, 0, 1280, 720);
-            cv::rectangle(qkf_gray, est_cv, cv::Scalar(255, 0, 0));
+            cv::rectangle(qkf_view_prev, est_cv, cv::Scalar(255, 0, 0), 2);
+           // cv::putText(qkf_gray,obj->getClassName()+to_string(obj->id()), est_cv.tl(),1, 1,cv::Scalar(255, 0, 0));
+        }
+        
+        gtsam::LevenbergMarquardtOptimizer optim(graph, init);
+        gtsam::Values opt = optim.optimize();
+        opt_pose = opt.at<gtsam::Pose3>(X(qkf->id())).matrix();
+        err = optim.error();
+
+        qkf_view_aft = qkf_dets[0]->getDetectionGroup()->view_.clone();
+        for(const auto& obj : h_graph.getObjects(qkf->getFloor())){
+            const DetectionGroup* dg = qkf_dets[0]->getDetectionGroup();
+            Eigen::Matrix3f K = dg->getIntrinsic();
+            gtsam::Cal3_S2::shared_ptr K_gtsam(new gtsam::Cal3_S2(K(0, 0), K(1, 1), 0.0, K(0, 2), K(1, 2)));
+            if(obj->Q().isBehind(gtsam::Pose3(opt_pose)) || obj->Q().contains(gtsam::Pose3(opt_pose))){
+                continue;
+            }
+            gtsam_quadrics::QuadricCamera qcam;
+            gtsam_quadrics::AlignedBox2 bbox_est = qcam.project(obj->Q(), gtsam::Pose3(opt_pose), K_gtsam).bounds();
+            cv::Rect est_cv = cv::Rect(bbox_est.xmin(), bbox_est.ymin(), bbox_est.width(), bbox_est.height()) & cv::Rect(0, 0, 1280, 720);
+            cv::rectangle(qkf_view_aft, est_cv, cv::Scalar(255, 0, 0), 2);
            // cv::putText(qkf_gray,obj->getClassName()+to_string(obj->id()), est_cv.tl(),1, 1,cv::Scalar(255, 0, 0));
         }
     }
@@ -445,19 +441,25 @@ bool LoopMatcher::matchStep1(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, Eige
     //---------------------
 
     cv::Mat match_image;
-    cv::drawMatches(qkf_gray, vector<cv::KeyPoint>(), tkf_gray, vector<cv::KeyPoint>(), vector<cv::DMatch>(), match_image);
+    cv::drawMatches(qkf_view, vector<cv::KeyPoint>(), tkf_view, vector<cv::KeyPoint>(), vector<cv::DMatch>(), match_image);
     string folder = "/home/nuninu98/match_test/"+to_string(qkf->id())+"/";
     if(!boost::filesystem::exists(folder)){
         boost::filesystem::create_directories(folder);
     }
     string filename = folder + to_string(qkf->id())+"_"+to_string(tkf->id())+"_"+"1stmatch";
-    cv::imwrite(filename+"_"+to_string(err)+"_.png", match_image);
+    cv::imwrite(filename+".png", match_image);
+
+    cv::Mat match_bef_aft;
+    cv::drawMatches(qkf_view_prev, vector<cv::KeyPoint>(), qkf_view_aft, vector<cv::KeyPoint>(), vector<cv::DMatch>(), match_bef_aft);
+    filename = folder + to_string(qkf->id())+"_"+to_string(tkf->id())+"_"+"1stmatch_comparison";
+    cv::imwrite(filename+".png", match_bef_aft);
+
     return true;
     //=================================================================
 }
 
 
-bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, const vector<pair<Detection*, Object*>>& unique_matches, Eigen::Matrix4d& opt_pose, double& score){
+bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, const vector<pair<Detection*, Object*>>& unique_matches, Eigen::Matrix4d& opt_pose, double& score, vector<pair<Detection*, Object*>>& match_output){
     vector<Detection*> qkf_dets;
     qkf->getDetections(qkf_dets);
 
@@ -569,10 +571,9 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
         
     }
     //For Debug
-    cv::Mat dg_gray = qkf_dets[0]->getDetectionGroup()->gray_.clone();
-    cv::Mat qkf_gray_prev, qkf_gray_aft;
-    cv::cvtColor(dg_gray, qkf_gray_prev, cv::COLOR_GRAY2BGR);
-    cv::cvtColor(dg_gray, qkf_gray_aft, cv::COLOR_GRAY2BGR);
+    cv::Mat qkf_view_prev = qkf_dets[0]->getDetectionGroup()->view_.clone(); 
+    cv::Mat qkf_view_aft = qkf_dets[0]->getDetectionGroup()->view_.clone(); 
+    
     //-------Debug---------
     unordered_set<Object*> matched_prev;
     for(int i = 0; i < corrs.size(); ++i){
@@ -583,11 +584,11 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
         gtsam_quadrics::QuadricCamera qcam;
         gtsam_quadrics::AlignedBox2 bbox_est = qcam.project(objects[cor.second]->Q(), gtsam::Pose3(opt_pose), K_gtsam).bounds();
         cv::Rect est_cv = cv::Rect(bbox_est.xmin(), bbox_est.ymin(), bbox_est.width(), bbox_est.height()) & cv::Rect(0, 0, 1280, 720);
-        cv::rectangle(qkf_gray_prev, est_cv, cv::Scalar(0, 255, 0));
-        cv::putText(qkf_gray_prev, to_string(i), est_cv.tl(), 1, 2, cv::Scalar(0, 255, 0));
+        cv::rectangle(qkf_view_prev, est_cv, cv::Scalar(0, 255, 0), 2);
+        cv::putText(qkf_view_prev, to_string(i), est_cv.tl(), 1, 2, cv::Scalar(0, 255, 0), 2);
 
-        cv::rectangle(qkf_gray_prev, qkf_dets[cor.first]->getROI_CV(), cv::Scalar(0, 0, 255));
-        cv::putText(qkf_gray_prev, to_string(i), qkf_dets[cor.first]->getROI_CV().tl(), 1, 2, cv::Scalar(0, 0, 255));
+        cv::rectangle(qkf_view_prev, qkf_dets[cor.first]->getROI_CV(), cv::Scalar(0, 0, 255), 2);
+        cv::putText(qkf_view_prev, to_string(i), qkf_dets[cor.first]->getROI_CV().tl(), 1, 2, cv::Scalar(0, 0, 255), 2);
         matched_prev.insert(objects[cor.second]);
     }
 
@@ -599,7 +600,7 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
     for(const auto& om_pair : visibles_prev){
         auto bbox_est = om_pair.second;
         cv::Rect est_cv = cv::Rect(bbox_est.xmin(), bbox_est.ymin(), bbox_est.width(), bbox_est.height()) & cv::Rect(0, 0, 1280, 720);
-        cv::rectangle(qkf_gray_prev, est_cv, cv::Scalar(255, 0, 0));
+        cv::rectangle(qkf_view_prev, est_cv, cv::Scalar(255, 0, 0), 2);
         //cv::putText(qkf_gray_prev, om_pair.first->getClassName(), est_cv.tl(),1, 1,cv::Scalar(255, 0, 0));
     }
 
@@ -607,6 +608,7 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
     gtsam::Values init(base_init);
     init.insert(X(qkf->id()), gtsam::Pose3(opt_pose));
     for(const auto& cor : corrs){
+        match_output.push_back({qkf_dets[cor.first], objects[cor.second]});
         const DetectionGroup* dg = qkf_dets[cor.first]->getDetectionGroup();
         Eigen::Matrix3f K = dg->getIntrinsic();
         gtsam::Cal3_S2::shared_ptr K_gtsam(new gtsam::Cal3_S2(K(0, 0), K(1, 1), 0.0, K(0, 2), K(1, 2)));
@@ -629,44 +631,42 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
         gtsam_quadrics::QuadricCamera qcam;
         gtsam_quadrics::AlignedBox2 bbox_est = qcam.project(objects[cor.second]->Q(), gtsam::Pose3(opt_pose), K_gtsam).bounds();
         cv::Rect est_cv = cv::Rect(bbox_est.xmin(), bbox_est.ymin(), bbox_est.width(), bbox_est.height()) & cv::Rect(0, 0, 1280, 720);
-        cv::rectangle(qkf_gray_aft, est_cv, cv::Scalar(0, 255, 0));
-        cv::putText(qkf_gray_aft, to_string(i), est_cv.tl(), 1, 2, cv::Scalar(0, 255, 0));
+        cv::rectangle(qkf_view_aft, est_cv, cv::Scalar(0, 255, 0), 2);
+        cv::putText(qkf_view_aft, to_string(i), est_cv.tl(), 1, 2, cv::Scalar(0, 255, 0), 2);
 
-        cv::rectangle(qkf_gray_aft, qkf_dets[cor.first]->getROI_CV(), cv::Scalar(0, 0, 255));
-        cv::putText(qkf_gray_aft, to_string(i), qkf_dets[cor.first]->getROI_CV().tl(), 1, 2, cv::Scalar(0, 0, 255));
+        cv::rectangle(qkf_view_aft, qkf_dets[cor.first]->getROI_CV(), cv::Scalar(0, 0, 255), 2);
+        cv::putText(qkf_view_aft, to_string(i), qkf_dets[cor.first]->getROI_CV().tl(), 1, 2, cv::Scalar(0, 0, 255), 2);
         matched_aft.insert(objects[cor.second]);
     }
 
     unordered_map<Object*, gtsam_quadrics::AlignedBox2> visibles_aft;
     extractiVisibles(objects, K, opt_pose, visibles_aft);
     for(const auto& om_pair : visibles_aft){
-        gtsam_quadrics::AlignedBox2 bbox_est = om_pair.second;
-        cv::Rect est_cv = cv::Rect(bbox_est.xmin(), bbox_est.ymin(), bbox_est.width(), bbox_est.height()) & cv::Rect(0, 0, 1280, 720);
-        cv::rectangle(qkf_gray_aft, est_cv, cv::Scalar(255, 0, 0));
+        if(matched_aft.find(om_pair.first) == matched_aft.end()){
+            gtsam_quadrics::AlignedBox2 bbox_est = om_pair.second;
+            cv::Rect est_cv = cv::Rect(bbox_est.xmin(), bbox_est.ymin(), bbox_est.width(), bbox_est.height()) & cv::Rect(0, 0, 1280, 720);
+            cv::rectangle(qkf_view_aft, est_cv, cv::Scalar(255, 0, 0));
+        }
         //cv::putText(qkf_gray_aft, om_pair.first->getClassName(), est_cv.tl(),1, 1,cv::Scalar(255, 0, 0));
     }
     double err = optim.error();
     cout<<"ERR: "<<err<<endl;
-   
-    
-    score = err;
-    bool same_pattern = patternMatched(visibles_prev, visibles_aft);
-    // if(err > 20.0){
-    //     return false;
-    // }
-    //---------------------
-    if(err > 30.0 || !same_pattern){
-        return false;
-    }
-    
     string folder = "/home/nuninu98/match_test/"+to_string(qkf->id())+"/";
     if(!boost::filesystem::exists(folder)){
         boost::filesystem::create_directories(folder);
     }
     cv::Mat match_image;
-    cv::drawMatches(qkf_gray_prev, vector<cv::KeyPoint>(), qkf_gray_aft, vector<cv::KeyPoint>(), vector<cv::DMatch>(), match_image);
+    cv::drawMatches(qkf_view_prev, vector<cv::KeyPoint>(), qkf_view_aft, vector<cv::KeyPoint>(), vector<cv::DMatch>(), match_image);
     string filename = folder + to_string(qkf->id())+"_"+to_string(tkf->id())+"_"+"2ndmatch";
     cv::imwrite(filename+to_string(err)+"_.png", match_image);
+    
+    score = err;
+    bool same_pattern = patternMatched(visibles_prev, visibles_aft);
+    if(err > 30.0 || !same_pattern){
+        return false;
+    }
+    
+   
     
     //=================================================================
     return true;
@@ -781,9 +781,8 @@ bool LoopMatcher::match3(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, LoopMatc
     }
     
     double score = 0.0;
-    bool result = matchStep2(qkf, tkf, h_graph, unique_matches, opt_pose, score);
+    bool result = matchStep2(qkf, tkf, h_graph, unique_matches, opt_pose, score, output.object_matches);
     output.drift = tkf->getPose().inverse() * opt_pose.cast<float>();
-    
     output.score = score;
     output.query = qkf->id();
     output.target = tkf->id();

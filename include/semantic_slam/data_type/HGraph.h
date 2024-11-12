@@ -44,6 +44,7 @@ class HGraph{
         KeyFrame* getKeyFrame(size_t id);
 
         void insert(KeyFrame* kf);
+
     };
 
 
