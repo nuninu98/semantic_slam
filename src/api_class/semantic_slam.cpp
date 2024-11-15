@@ -1,6 +1,7 @@
 #include <semantic_slam/api_class/semantic_slam.h>
 SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false), depth_factor_(1000.0), floor_(nullptr), kf_updated_(false), last_key_(nullptr), last_oid_(-1)
 {
+
     cout<<"ORTOOLS VERSION: "<<operations_research::OrToolsVersionString()<<endl;
     string voc_file;
     pnh_.param<string>("vocabulary_file", voc_file, "/home/nuninu98/catkin_ws/src/orb_semantic_slam/model/ORBvoc.txt");
@@ -103,6 +104,7 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     front_sync_->registerCallback(boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, _2, Eigen::Matrix4f::Identity(), K_front_, 'X'));
 
     record_sub_ = nh_.subscribe("record_flag", 1000, &SemanticSLAM::recordCallback, this);
+
 }
 
 void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image){
@@ -583,25 +585,47 @@ void SemanticSLAM::keyframeCallback(){
         addKeyFrame(new_kf, detection_groups);
         vector<pair<KeyFrame*, float>> loop_candidates;
         if(new_kf->id() % 10 == 0){
-            
             vector<Detection*> kf_dets;
             new_kf->getDetections(kf_dets);
             float uscore = 0.0;
+            Detection* most_unique_det = nullptr;
             //float unmatch_rate = 0.0;
             bool full_matched = true;
             for(const auto& d: kf_dets){
-                uscore = max(uscore, h_graph_.getUScore(floor_, d->getClassName()));
+                float score = h_graph_.getUScore(floor_, d->getClassName());
+                if(score > uscore){
+                    uscore = score;
+                    most_unique_det = d;
+                }
                 if(d->getCorrespondence() == nullptr){
-                    //unmatch_rate += 1.0 / (kf_dets.size());
                     full_matched = false;
                 }
             }
-            // if(uscore > 0.1 && unmatch_rate > 0.5){
-            //     findSemanticLoopCandidates(new_kf, ceil(1.0 / uscore) + 2, loop_candidates);
-            // }
-            if(uscore > 0.1 && !full_matched){
-                findSemanticLoopCandidates(new_kf, ceil(1.0 / uscore) + 2, loop_candidates);
-            } 
+            
+            if(uscore > 0.1){
+                if(!full_matched){
+                    findSemanticLoopCandidates(new_kf, ceil(1.0 / uscore) + 2, loop_candidates);
+                }
+                else{
+                    //==========For Visualization=============
+                    Object* u_obj = most_unique_det->getCorrespondence();
+                    vector<KeyFrame*> seens;
+                    u_obj->getConnectedKeyFrames(seens);
+                    for(const auto& kf : seens){
+                        if(new_kf->id() - kf->id() > 500 && new_kf->id() - last_loop_ > 100){
+                            loop_lock_.lock();
+                            vector<pair<Detection*, Object*>> v;
+                            loops_.push_back(LoopMatchResult(new_kf->id(), kf->id(), Eigen::Matrix4f::Identity(), v, 0.0, u_obj));
+                            last_loop_ = new_kf->id();
+                            loop_lock_.unlock();
+                            cout<<"INSERT: "<<kf->id()<<" "<<new_kf->id()<<endl;
+                            break;
+                        }
+                    }
+                    //========================================
+                }
+            }
+
         }
         registerObjects(new_kf);
         isam_.update(new_factors_, new_values_);
@@ -653,40 +677,10 @@ void SemanticSLAM::keyframeCallback(){
         visualization_msgs::MarkerArray h_graph_vis;
         visualizeHGraph(h_graph_vis);
         pub_h_graph_.publish(h_graph_vis);
-        
-        
-        // if(loop_candidates[0].second < 0.8){
-        //     continue;
-        // }
-        // ORB_SLAM3::LoopQuery lq(ORB_SLAM3::LOOP_TYPE::SEMANTIC ,new_kf->id(), loop_candidates[0].first->id(), Eigen::Matrix4f::Zero());
-        //===========Test===============
-        // string fileFolder = "/home/nuninu98/loopscore/";
-        // ofstream semantic_score(fileFolder + "sem"+to_string(new_kf->id())+".txt", ios::app);
-        // ofstream bow_score(fileFolder + "bow"+to_string(new_kf->id())+".txt", ios::app);
-        // for(int i = 0; i < loop_candidates.size(); ++i){
-        //     semantic_score << loop_candidates[i].first->id()<<" "<<loop_candidates[i].second<<endl;
-        // }
-        // for(int i = 0; i < loop_candidates.size(); ++i){
-        //     //bow_score << lq.candidates[i].second<<" "<<lq.candidates[i].first<<endl;
-        //     bow_score << loop_candidates[i].first->id()<<" "<<L1Score(kfs_[new_kf->id()]->bow_vec, loop_candidates[i].first->bow_vec) <<endl;
-        // }
-        // string queryFolder = "/home/nuninu98/loopscore/" + to_string(new_kf->id())+"/";
-        // if(!boost::filesystem::exists(queryFolder)){
-        //     boost::filesystem::create_directory(queryFolder);
-        // }
-        // vector<const DetectionGroup*> query_dgs, best_sem_dgs;
-        // new_kf->getDetection(query_dgs);
-        // loop_candidates[0].first->getDetection(best_sem_dgs);
-        // for(auto& elem : query_dgs){
-        //     cv::imwrite(queryFolder + "query_img"+elem->sID() + ".png", elem->gray_); 
-        // }
-
-        // for(auto& elem : best_sem_dgs){
-        //     cv::imwrite(queryFolder + to_string(loop_candidates[0].first->id())+elem->sID() + ".png", elem->gray_); 
-        // }
-        //==============================
+               
     }
 }
+
 
 void SemanticSLAM::loopQueryCallback(){
     while(true){
@@ -740,7 +734,7 @@ void SemanticSLAM::loopQueryCallback(){
                         
                     }
                     
-                    if(object_uscore.size() >= 3 && qry_dets.size() > 3){
+                    if(object_uscore.size() >= 3 && qry_dets.size() > 2){
                         LoopMatchResult result;
                         //bool loop_matched = loop_matcher_.match2(qkf, tkf, object_uscore, result);
                         bool loop_matched = loop_matcher_.match3(qkf, tkf, h_graph_, result);
@@ -748,9 +742,7 @@ void SemanticSLAM::loopQueryCallback(){
                         if(loop_matched){
                             Eigen::Matrix4f diff1 = tkf->getPose().inverse() * qkf->getPose();
                             double diff = (result.drift.inverse() * diff1).block<3, 1>(0, 3).norm();
-                            //result.score = diff; //* result.score;
                             result_sorted.push_back(result);
-                            //break;
                         }
                     }
 
@@ -778,6 +770,8 @@ void SemanticSLAM::loopQueryCallback(){
                         new_factors_.add(bbf);
                     }
                     gtsam_lock_.unlock();
+                    loops_.push_back(result_sorted[0]);
+                    cout<<"INSERT: "<<result_sorted[0].target<<" "<<result_sorted[0].query<<endl;
                 }
             }
             
@@ -1101,8 +1095,8 @@ void SemanticSLAM::recordCallback(const std_msgs::BoolConstPtr& msg){
     if(!boost::filesystem::exists(folder)){
         boost::filesystem::create_directories(folder);
     }
-    string filename = "smslam_lcd.txt";
-    ofstream traj_file(folder + filename);
+    string traj_filename = "proposed.txt";
+    ofstream traj_file(folder + traj_filename);
     for(size_t i = 0; i < last_key_->id(); ++i){
         auto kf = h_graph_.getKeyFrame(i);
         if(kf == nullptr){
@@ -1110,6 +1104,14 @@ void SemanticSLAM::recordCallback(const std_msgs::BoolConstPtr& msg){
         }
         Eigen::Matrix4f se3 = OPTIC_TF* kf->getPose();
         traj_file << se3(0, 3)<<" "<<se3(1, 3)<<endl;
+    }
+
+    string loop_filename= "proposed_loop.txt";
+    ofstream loops_file(folder + loop_filename);
+    for(size_t i = 0; i < loops_.size(); ++i){
+        auto centroid = loops_[i].unique_obj->Q().pose().matrix().cast<float>();
+        Eigen::Matrix4f se3_centroid = OPTIC_TF * centroid;
+        loops_file<<loops_[i].query<<" "<<loops_[i].target<<" "<<se3_centroid(0, 3)<<" "<<se3_centroid(1, 3)<<" "<<se3_centroid(2, 3)<<endl;
     }
     cout<<"WRITTEN!"<<endl;
 }

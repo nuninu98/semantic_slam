@@ -645,7 +645,7 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
         if(matched_aft.find(om_pair.first) == matched_aft.end()){
             gtsam_quadrics::AlignedBox2 bbox_est = om_pair.second;
             cv::Rect est_cv = cv::Rect(bbox_est.xmin(), bbox_est.ymin(), bbox_est.width(), bbox_est.height()) & cv::Rect(0, 0, 1280, 720);
-            cv::rectangle(qkf_view_aft, est_cv, cv::Scalar(255, 0, 0));
+            cv::rectangle(qkf_view_aft, est_cv, cv::Scalar(255, 0, 0), 2);
         }
         //cv::putText(qkf_gray_aft, om_pair.first->getClassName(), est_cv.tl(),1, 1,cv::Scalar(255, 0, 0));
     }
@@ -699,62 +699,91 @@ bool LoopMatcher::patternMatched(unordered_map<Object*, gtsam_quadrics::AlignedB
     if(commons.size() < 3){
         return false;
     }
-    gtsam::Point2 mu1(0.0, 0.0);
-    gtsam::Point2 mu2(0.0, 0.0);
-    for(const auto& common_obj: commons){
-        mu1 += visible1[common_obj].center();
-        mu2 += visible1[common_obj].center();
-    }
-    mu1 /= commons.size();
-    mu2 /= commons.size();
+    // gtsam::Point2 mu1(0.0, 0.0);
+    // gtsam::Point2 mu2(0.0, 0.0);
+    // for(const auto& common_obj: commons){
+    //     mu1 += visible1[common_obj].center();
+    //     mu2 += visible1[common_obj].center();
+    // }
+    // mu1 /= commons.size();
+    // mu2 /= commons.size();
     
-    Eigen::Matrix2d cov1 = Eigen::Matrix2d::Zero();
-    Eigen::Matrix2d cov2 = Eigen::Matrix2d::Zero();
+    // Eigen::Matrix2d cov1 = Eigen::Matrix2d::Zero();
+    // Eigen::Matrix2d cov2 = Eigen::Matrix2d::Zero();
 
-    for(const auto& common_obj: commons){
-        Eigen::Vector2d p1 = visible1[common_obj].center() - mu1;
-        cov1 += p1 * p1.transpose();
+    // for(const auto& common_obj: commons){
+    //     Eigen::Vector2d p1 = visible1[common_obj].center() - mu1;
+    //     cov1 += p1 * p1.transpose();
 
-        Eigen::Vector2d p2 = visible2[common_obj].center() - mu2;
-        cov2 += p2 * p2.transpose();
-    }
-    cov1 /= commons.size();
-    cov2 /= commons.size();
-    // cout<<"COV1: \n"<<cov1<<endl;
-    // cout<<"COV2: \n"<<cov2<<endl;
+    //     Eigen::Vector2d p2 = visible2[common_obj].center() - mu2;
+    //     cov2 += p2 * p2.transpose();
+    // }
+    // cov1 /= commons.size();
+    // cov2 /= commons.size();
+    // // cout<<"COV1: \n"<<cov1<<endl;
+    // // cout<<"COV2: \n"<<cov2<<endl;
 
-    Eigen::JacobiSVD<Eigen::Matrix2d> svd1(cov1, Eigen::ComputeFullU | Eigen::ComputeFullV);
-    Eigen::JacobiSVD<Eigen::Matrix2d> svd2(cov2, Eigen::ComputeFullU | Eigen::ComputeFullV);
-    Eigen::Vector2d axis1 = svd1.matrixU().block<2, 1>(0, 0);
-    Eigen::Vector2d axis2 = svd2.matrixU().block<2, 1>(0, 0);
-    double cos_sim = axis1.dot(axis2);
-    //cout<<"COS SIM: "<<cos_sim<<endl;
+    // Eigen::JacobiSVD<Eigen::Matrix2d> svd1(cov1, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    // Eigen::JacobiSVD<Eigen::Matrix2d> svd2(cov2, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    // Eigen::Vector2d axis1 = svd1.matrixU().block<2, 1>(0, 0);
+    // Eigen::Vector2d axis2 = svd2.matrixU().block<2, 1>(0, 0);
+    // double cos_sim = axis1.dot(axis2);
+    // //cout<<"COS SIM: "<<cos_sim<<endl;
     
-    Eigen::Vector2d S1 = svd1.singularValues().normalized();
-    Eigen::Vector2d S2 = svd2.singularValues().normalized();
-    double shape_sim = S1.dot(S2);//(S1 - S2).norm();
-    // cout<<"S1 "<<S1.transpose()<<endl;
-    // cout<<"S2 "<<S2.transpose()<<endl;
-    // cout<<"SHAPE SIM: "<<shape_sim<<endl;
+    // Eigen::Vector2d S1 = svd1.singularValues().normalized();
+    // Eigen::Vector2d S2 = svd2.singularValues().normalized();
+    // double shape_sim = S1.dot(S2);//(S1 - S2).norm();
+    // // cout<<"S1 "<<S1.transpose()<<endl;
+    // // cout<<"S2 "<<S2.transpose()<<endl;
+    // // cout<<"SHAPE SIM: "<<shape_sim<<endl;
 
-    Eigen::MatrixXd adjacent1 = Eigen::MatrixXd::Zero(commons.size(), commons.size());
-    Eigen::MatrixXd adjacent2 = Eigen::MatrixXd::Zero(commons.size(), commons.size());
+    Eigen::MatrixXd A1 = Eigen::MatrixXd::Zero(commons.size(), commons.size());
+    Eigen::MatrixXd A2 = Eigen::MatrixXd::Zero(commons.size(), commons.size());
     for(int i = 0; i < commons.size(); ++i){
         for(int j = 0; j < commons.size(); ++j){
             double dist1 = (visible1[commons[i]].center() - visible1[commons[j]].center()).norm();
             double dist2 = (visible2[commons[i]].center() - visible2[commons[j]].center()).norm();
         
-            adjacent1(i, j) = dist1;
-            adjacent1(j, i) = dist1;
+            A1(i, j) = dist1;
+            A1(j, i) = dist1;
 
-            adjacent2(i, j) = dist2;
-            adjacent2(i, j) = dist2;
+            A2(i, j) = dist2;
+            A2(i, j) = dist2;
         }
     }
-    adjacent1.rowwise().normalize();
-    adjacent2.rowwise().normalize();
-    Eigen::JacobiSVD<Eigen::MatrixXd> svd_adj1(adjacent1, Eigen::ComputeFullU | Eigen::ComputeFullV);
-    Eigen::JacobiSVD<Eigen::MatrixXd> svd_adj2(adjacent2, Eigen::ComputeFullU | Eigen::ComputeFullV);
+
+    //=========Laplacian=============
+    Eigen::MatrixXd D1 = Eigen::MatrixXd::Zero(commons.size(), commons.size());
+    Eigen::MatrixXd D2 = Eigen::MatrixXd::Zero(commons.size(), commons.size());
+    for(int i = 0; i < commons.size(); ++i){
+        D1(i, i) = A1.row(i).sum();
+        D2(i, i) = A2.row(i).sum();
+    }
+    Eigen::MatrixXd L1 = D1 - A1;
+    Eigen::MatrixXd L2 = D2 - A2;
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> laplacian_solver;
+    laplacian_solver.compute(L1, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Eigen::VectorXd f1 = laplacian_solver.eigenvectors().col(1);
+    
+    laplacian_solver.compute(L2, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Eigen::VectorXd f2 = laplacian_solver.eigenvectors().col(1);
+    if(f1(0) * f2(0) < 0.0){
+        f2 *= -1.0;
+    }
+    int fielder_unmatches = 0;
+    for(int i = 0; i < commons.size(); ++i){
+        if(f1(i) * f2(i) < 0){
+            fielder_unmatches++;
+        }
+    }
+    double unmatch_rate = ((double)(fielder_unmatches) / commons.size());
+    cout<<"UNMATCH RATE: "<<fielder_unmatches<<"/"<<commons.size()<<endl;
+    
+    //===============================
+    Eigen::MatrixXd A1_norm = A1.rowwise().normalized();
+    Eigen::MatrixXd A2_norm = A2.rowwise().normalized();
+    Eigen::JacobiSVD<Eigen::MatrixXd> svd_adj1(A1_norm, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Eigen::JacobiSVD<Eigen::MatrixXd> svd_adj2(A2_norm, Eigen::ComputeFullU | Eigen::ComputeFullV);
     auto sigs1 = svd_adj1.singularValues();
     auto sigs2 = svd_adj2.singularValues();
 
@@ -762,10 +791,11 @@ bool LoopMatcher::patternMatched(unordered_map<Object*, gtsam_quadrics::AlignedB
     Eigen::VectorXd v2 = svd_adj2.matrixV().col(0);
     cout<<"SIG ERR: "<<(sigs1 - sigs2).norm()<<endl;
     cout<<"---"<<endl;
+    
     if((sigs1 - sigs2).norm() > 0.5){
         return false;
     }
-    //cout<<"ADJ cosSim: "<<v1.dot(v2)<<endl;
+    // //cout<<"ADJ cosSim: "<<v1.dot(v2)<<endl;
     
     
     return true;
@@ -786,5 +816,6 @@ bool LoopMatcher::match3(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, LoopMatc
     output.score = score;
     output.query = qkf->id();
     output.target = tkf->id();
+    output.unique_obj = unique_matches[0].second;
     return result;
 }

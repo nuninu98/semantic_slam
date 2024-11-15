@@ -30,7 +30,7 @@ RawWrapper::RawWrapper(): pnh_("~"), kf_updated_(false), kill_flag_(false), thre
     loop_thread_ = thread(&RawWrapper::loopQueryCallback, this);
     loop_thread_.detach();
 
-    sub_yolo_  = nh_.subscribe("/side/color/image_raw/yolo", 1, &RawWrapper::detectionImageCallback, this);
+    //sub_yolo_  = nh_.subscribe("/side/color/image_raw/yolo", 1, &RawWrapper::detectionImageCallback, this);
 
     tracking_color_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, rgb_topic, 1));
     tracking_depth_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, depth_topic, 1));
@@ -140,17 +140,18 @@ void RawWrapper::loopQueryCallback(){
         while(!lc_buf_.empty()){
             ORB_SLAM3::LoopQuery lq = lc_buf_.front();
             if(lq.type == ORB_SLAM3::LOOP_TYPE::BAG_OF_WORDS){
-                if(kfID_room_[lq.id_query] != kfID_room_[lq.id_target] && (!kfID_room_[lq.id_query].empty() && !kfID_room_[lq.id_target].empty())){
-                    cout<<"DIFF ROOM: "<<kfID_room_[lq.id_query]<<" "<<kfID_room_[lq.id_target]<<endl;
-                    string folder = "/home/nuninu98/test_orbloop/"+to_string(lq.id_query)+"/";
-                    if(!boost::filesystem::exists(folder)){
-                        boost::filesystem::create_directories(folder);
-                    }
-                    cv::Mat match_image;
-                    cv::drawMatches(kfID_images_[lq.id_query], vector<cv::KeyPoint>(), kfID_images_[lq.id_target], vector<cv::KeyPoint>(), vector<cv::DMatch>(), match_image);
-                    string filename = folder + to_string(lq.id_query)+"_"+to_string(lq.id_target)+"_number_match";
-                    cv::imwrite(filename+".png", match_image);
-                }
+                loops_.push_back({lq.id_query, lq.id_target});
+                // if(kfID_room_[lq.id_query] != kfID_room_[lq.id_target] && (!kfID_room_[lq.id_query].empty() && !kfID_room_[lq.id_target].empty())){
+                //     cout<<"DIFF ROOM: "<<kfID_room_[lq.id_query]<<" "<<kfID_room_[lq.id_target]<<endl;
+                //     string folder = "/home/nuninu98/test_orbloop/"+to_string(lq.id_query)+"/";
+                //     if(!boost::filesystem::exists(folder)){
+                //         boost::filesystem::create_directories(folder);
+                //     }
+                //     cv::Mat match_image;
+                //     cv::drawMatches(kfID_images_[lq.id_query], vector<cv::KeyPoint>(), kfID_images_[lq.id_target], vector<cv::KeyPoint>(), vector<cv::DMatch>(), match_image);
+                //     string filename = folder + to_string(lq.id_query)+"_"+to_string(lq.id_target)+"_number_match";
+                //     cv::imwrite(filename+".png", match_image);
+                // }
             }
             
             lc_buf_.pop();
@@ -203,5 +204,13 @@ void RawWrapper::recordCallback(const std_msgs::BoolConstPtr& msg){
         Eigen::Matrix4f se3 = OPTIC_TF* keyframes[i]->GetPoseInverse().matrix();
         traj_file << se3(0, 3)<<" "<<se3(1, 3)<<endl;
     }
+
+    filename = "orbslam_loop.txt";
+    ofstream loop_file(folder + filename);
+    loop_lock_.lock();
+    for(size_t i = 0; i< loops_.size(); ++i){
+        loop_file << loops_[i].first<<" "<<loops_[i].second<<endl;
+    }
+    loop_lock_.unlock();
     cout<<"WRITTEN!"<<endl;
 }

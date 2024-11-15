@@ -96,6 +96,7 @@ class RawWrapper{
 
         ros::Subscriber record_sub_;
         void recordCallback(const std_msgs::BoolConstPtr& msg);
+        vector<pair<size_t, size_t>> loops_;
     public:
         RawWrapper();
 

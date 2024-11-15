@@ -120,6 +120,8 @@ class SemanticSLAM{
         ros::Publisher pub_h_graph_;
         ros::Publisher pub_map_cloud_;
         
+        ros::Publisher pub_loopclosure_;
+        
         void visualizeHGraph(visualization_msgs::MarkerArray& output);
         
         //=========Test Floor Plane===========
@@ -163,6 +165,9 @@ class SemanticSLAM{
 
         ros::Subscriber record_sub_;
         void recordCallback(const std_msgs::BoolConstPtr& msg);
+        
+        vector<LoopMatchResult> loops_;
+    
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         SemanticSLAM();
