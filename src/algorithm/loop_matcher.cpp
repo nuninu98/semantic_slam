@@ -252,6 +252,52 @@ bool LoopMatcher::match2(KeyFrame* qkf, KeyFrame* tkf, const vector<pair<Object*
     return true;
 }
 
+double LoopMatcher::L1Score(const DBoW2::BowVector &v1, const DBoW2::BowVector &v2) const{
+    DBoW2::BowVector::const_iterator v1_it, v2_it;
+    const DBoW2::BowVector::const_iterator v1_end = v1.end();
+    const DBoW2::BowVector::const_iterator v2_end = v2.end();
+    
+    v1_it = v1.begin();
+    v2_it = v2.begin();
+    
+    double score = 0;
+    
+    while(v1_it != v1_end && v2_it != v2_end)
+    {
+        const DBoW2::WordValue& vi = v1_it->second;
+        const DBoW2::WordValue& wi = v2_it->second;
+        
+        if(v1_it->first == v2_it->first)
+        {
+        score += fabs(vi - wi) - fabs(vi) - fabs(wi);
+        
+        // move v1 and v2 forward
+        ++v1_it;
+        ++v2_it;
+        }
+        else if(v1_it->first < v2_it->first)
+        {
+        // move v1 forward
+        v1_it = v1.lower_bound(v2_it->first);
+        // v1_it = (first element >= v2_it.id)
+        }
+        else
+        {
+        // move v2 forward
+        v2_it = v2.lower_bound(v1_it->first);
+        // v2_it = (first element >= v1_it.id)
+        }
+    }
+    
+    // ||v - w||_{L1} = 2 + Sum(|v_i - w_i| - |v_i| - |w_i|) 
+    //		for all i | v_i != 0 and w_i != 0 
+    // (Nister, 2006)
+    // scaled_||v - w||_{L1} = 1 - 0.5 * ||v - w||_{L1}
+    score = -score/2.0;
+
+    return score; // [0..1]
+}
+
 bool LoopMatcher::matchStep1(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, Eigen::Matrix4d& opt_pose, vector<pair<Detection*, Object*>>& unique_matches){
     opt_pose = qkf->getPose().cast<double>();
     vector<Detection*> qkf_dets;
@@ -449,10 +495,10 @@ bool LoopMatcher::matchStep1(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, Eige
     string filename = folder + to_string(qkf->id())+"_"+to_string(tkf->id())+"_"+"1stmatch";
     cv::imwrite(filename+".png", match_image);
 
-    cv::Mat match_bef_aft;
-    cv::drawMatches(qkf_view_prev, vector<cv::KeyPoint>(), qkf_view_aft, vector<cv::KeyPoint>(), vector<cv::DMatch>(), match_bef_aft);
-    filename = folder + to_string(qkf->id())+"_"+to_string(tkf->id())+"_"+"1stmatch_comparison";
-    cv::imwrite(filename+".png", match_bef_aft);
+    // cv::Mat match_bef_aft;
+    // cv::drawMatches(qkf_view_prev, vector<cv::KeyPoint>(), qkf_view_aft, vector<cv::KeyPoint>(), vector<cv::DMatch>(), match_bef_aft);
+    // filename = folder + to_string(qkf->id())+"_"+to_string(tkf->id())+"_"+"1stmatch_comparison";
+    // cv::imwrite(filename+".png", match_bef_aft);
 
     return true;
     //=================================================================
@@ -462,7 +508,6 @@ bool LoopMatcher::matchStep1(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, Eige
 bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, const vector<pair<Detection*, Object*>>& unique_matches, Eigen::Matrix4d& opt_pose, double& score, vector<pair<Detection*, Object*>>& match_output){
     vector<Detection*> qkf_dets;
     qkf->getDetections(qkf_dets);
-
     gtsam::NonlinearFactorGraph base_graph;
     gtsam::Values base_init;
     for(const auto& elem : h_graph.getObjects(qkf->getFloor())){
@@ -651,17 +696,35 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
     }
     double err = optim.error();
     cout<<"ERR: "<<err<<endl;
+    // string folder = "/home/nuninu98/match_test/"+to_string(qkf->id())+"/";
+    // if(!boost::filesystem::exists(folder)){
+    //     boost::filesystem::create_directories(folder);
+    // }
+    // cv::Mat match_image;
+    // cv::drawMatches(qkf_view_prev, vector<cv::KeyPoint>(), qkf_view_aft, vector<cv::KeyPoint>(), vector<cv::DMatch>(), match_image);
+    // string filename = folder + to_string(qkf->id())+"_"+to_string(tkf->id())+"_"+"2ndmatch";
+    // cv::imwrite(filename+to_string(err)+"_.png", match_image);
+    
+    score = err;
+    double fvec_err = 1000.0;
+    bool same_pattern = patternMatched(visibles_prev, visibles_aft, fvec_err);
+    
+    //=============Debug validation===================
+    double l1score = L1Score(qkf->bow_vec, tkf->bow_vec);
     string folder = "/home/nuninu98/match_test/"+to_string(qkf->id())+"/";
     if(!boost::filesystem::exists(folder)){
         boost::filesystem::create_directories(folder);
     }
-    cv::Mat match_image;
-    cv::drawMatches(qkf_view_prev, vector<cv::KeyPoint>(), qkf_view_aft, vector<cv::KeyPoint>(), vector<cv::DMatch>(), match_image);
-    string filename = folder + to_string(qkf->id())+"_"+to_string(tkf->id())+"_"+"2ndmatch";
-    cv::imwrite(filename+to_string(err)+"_.png", match_image);
-    
-    score = err;
-    bool same_pattern = patternMatched(visibles_prev, visibles_aft);
+    ofstream txtfile;
+    txtfile.open(folder + "scores.txt", ios_base::app);
+    txtfile<<tkf->id()<<" "<< fvec_err<<" "<< l1score<<endl;
+    if(!boost::filesystem::exists(folder + to_string(qkf->id()) + ".png")){
+        cv::imwrite(folder + to_string(qkf->id()) + ".png", qkf_dets[0]->getDetectionGroup()->view_.clone());
+    }
+    vector<Detection*> tkf_dets;
+    tkf->getDetections(tkf_dets);
+    cv::imwrite(folder + to_string(tkf->id()) + ".png", tkf_dets[0]->getDetectionGroup()->view_.clone());
+    //====================================================
     if(err > 30.0 || !same_pattern){
         return false;
     }
@@ -688,7 +751,7 @@ void LoopMatcher::extractiVisibles(const vector<Object*> objects, const Eigen::M
     }
 }
 
-bool LoopMatcher::patternMatched(unordered_map<Object*, gtsam_quadrics::AlignedBox2>& visible1,  unordered_map<Object*, gtsam_quadrics::AlignedBox2>& visible2){
+bool LoopMatcher::patternMatched(unordered_map<Object*, gtsam_quadrics::AlignedBox2>& visible1,  unordered_map<Object*, gtsam_quadrics::AlignedBox2>& visible2, double& fvec_err){
     vector<Object*> commons;
     for(const auto& elem : visible1){
         if(visible2.find(elem.first) != visible2.end()){
@@ -697,6 +760,7 @@ bool LoopMatcher::patternMatched(unordered_map<Object*, gtsam_quadrics::AlignedB
     }
 
     if(commons.size() < 3){
+        fvec_err = 1000.0;
         return false;
     }
     // gtsam::Point2 mu1(0.0, 0.0);
@@ -767,18 +831,20 @@ bool LoopMatcher::patternMatched(unordered_map<Object*, gtsam_quadrics::AlignedB
     
     laplacian_solver.compute(L2, Eigen::ComputeFullU | Eigen::ComputeFullV);
     Eigen::VectorXd f2 = laplacian_solver.eigenvectors().col(1);
-    if(f1(0) * f2(0) < 0.0){
-        f2 *= -1.0;
-    }
-    int fielder_unmatches = 0;
-    for(int i = 0; i < commons.size(); ++i){
-        if(f1(i) * f2(i) < 0){
-            fielder_unmatches++;
-        }
-    }
-    double unmatch_rate = ((double)(fielder_unmatches) / commons.size());
-    cout<<"UNMATCH RATE: "<<fielder_unmatches<<"/"<<commons.size()<<endl;
-    
+    // if(f1(0) * f2(0) < 0.0){
+    //     f2 *= -1.0;
+    // }
+    // int fielder_unmatches = 0;
+    // for(int i = 0; i < commons.size(); ++i){
+    //     if(f1(i) * f2(i) < 0){
+    //         fielder_unmatches++;
+    //     }
+    // }
+    // double unmatch_rate = ((double)(fielder_unmatches) / commons.size());
+    // cout<<"UNMATCH RATE: "<<fielder_unmatches<<"/"<<commons.size()<<endl;
+    fvec_err = (f1- f2).norm();
+    cout<<"FIELDER ERR: "<<fvec_err<<endl;
+
     //===============================
     Eigen::MatrixXd A1_norm = A1.rowwise().normalized();
     Eigen::MatrixXd A2_norm = A2.rowwise().normalized();
@@ -791,8 +857,13 @@ bool LoopMatcher::patternMatched(unordered_map<Object*, gtsam_quadrics::AlignedB
     Eigen::VectorXd v2 = svd_adj2.matrixV().col(0);
     cout<<"SIG ERR: "<<(sigs1 - sigs2).norm()<<endl;
     cout<<"---"<<endl;
+
+   
     
-    if((sigs1 - sigs2).norm() > 0.5){
+    // if((sigs1 - sigs2).norm() > 0.5){
+    //     return false;
+    // }
+    if((f1 - f2).norm() > 0.2){
         return false;
     }
     // //cout<<"ADJ cosSim: "<<v1.dot(v2)<<endl;

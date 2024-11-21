@@ -154,8 +154,6 @@ class SemanticSLAM{
         void getMapCloud(pcl::PointCloud<pcl::PointXYZRGB>& output);
     
         void findSemanticLoopCandidates(KeyFrame* kf, int N, vector<pair<KeyFrame*, float>>& output);
-    
-        double L1Score(const DBoW2::BowVector &v1, const DBoW2::BowVector &v2) const;
 
         LoopMatcher loop_matcher_;
         size_t last_loop_ = 0;

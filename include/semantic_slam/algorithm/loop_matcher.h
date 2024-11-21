@@ -24,8 +24,9 @@ class LoopMatcher{
 
         bool matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, const vector<pair<Detection*, Object*>>& unique_matches, Eigen::Matrix4d& opt_pose, double& score, vector<pair<Detection*, Object*>>& match_output);
     
-        bool patternMatched( unordered_map<Object*, gtsam_quadrics::AlignedBox2>& visible1, unordered_map<Object*, gtsam_quadrics::AlignedBox2>& visible2);
-    
+        bool patternMatched( unordered_map<Object*, gtsam_quadrics::AlignedBox2>& visible1, unordered_map<Object*, gtsam_quadrics::AlignedBox2>& visible2, double& fvec_err);
+
+        double L1Score(const DBoW2::BowVector &v1, const DBoW2::BowVector &v2) const;
     public:
         LoopMatcher();
 
