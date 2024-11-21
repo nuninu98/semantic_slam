@@ -62,10 +62,10 @@ class SemanticSLAM{
         shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> tracking_depth_;
         shared_ptr< message_filters::Synchronizer<track_sync_pol>> tracking_sync_;
 
-        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> side_color_;
-        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> side_depth_;
-        shared_ptr<message_filters::Subscriber<yolo_protocol::YoloResult>> side_yolo_;
-        shared_ptr< message_filters::Synchronizer<yolo_sync_pol>> side_sync_;
+        // shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> side_color_;
+        // shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> side_depth_;
+        // shared_ptr<message_filters::Subscriber<yolo_protocol::YoloResult>> side_yolo_;
+        // shared_ptr< message_filters::Synchronizer<yolo_sync_pol>> side_sync_;
 
         shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> front_color_;
         shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> front_depth_;
@@ -99,7 +99,7 @@ class SemanticSLAM{
 
         //void detectionImageCallback(const sensor_msgs::ImageConstPtr& color_image, const shared_ptr<LandmarkDetector>& detector, const Eigen::Matrix4f& sensor_pose);
       
-        void detectionImageCallback(const sensor_msgs::ImageConstPtr& depth_image, const yolo_protocol::YoloResultConstPtr& yolo_result, const Eigen::Matrix4f& sensor_pose, const Eigen::Matrix3f& K, char sID);
+        void detectionImageCallback(const sensor_msgs::ImageConstPtr& depth_image, const yolo_protocol::YoloResultConstPtr& yolo_result, const Eigen::Matrix4f& sensor_pose, const Eigen::Matrix3f& K);
         Eigen::Matrix4f sidecam_in_frontcam_; // optic
         double depth_factor_;
 

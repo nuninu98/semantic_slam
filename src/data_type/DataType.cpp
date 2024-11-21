@@ -218,13 +218,13 @@
     //=====================DetectionGroup================
     DetectionGroup::DetectionGroup(){}
 
-    DetectionGroup::DetectionGroup(const DetectionGroup& dg) : sensor_pose_(dg.sensor_pose_), detections_(dg.detections_), K_(dg.K_), stamp_(dg.stamp_), kf_(dg.kf_), sid_(dg.sid_), view_(dg.view_){
+    DetectionGroup::DetectionGroup(const DetectionGroup& dg) : sensor_pose_(dg.sensor_pose_), detections_(dg.detections_), K_(dg.K_), stamp_(dg.stamp_), kf_(dg.kf_), view_(dg.view_){
         for(auto& elem : detections_){
             elem->setDetectionGroup(this);
         }
     }
 
-    DetectionGroup::DetectionGroup(const Eigen::Matrix4f& sensor_pose, const vector<Detection*>& detections, const Eigen::Matrix3f& K, double stamp, char sid): sensor_pose_(sensor_pose), stamp_(stamp), K_(K), detections_(detections), kf_(nullptr), sid_(sid)
+    DetectionGroup::DetectionGroup(const Eigen::Matrix4f& sensor_pose, const vector<Detection*>& detections, const Eigen::Matrix3f& K, double stamp): sensor_pose_(sensor_pose), stamp_(stamp), K_(K), detections_(detections), kf_(nullptr)
     {
     // detection sibal
         for(auto& elem : detections_){
@@ -264,16 +264,13 @@
         return kf_;
     }
 
-    char DetectionGroup::sID() const{
-        return sid_;
-    }
+
 
     DetectionGroup& DetectionGroup::operator=(const DetectionGroup& dg){        
         detections_=dg.detections_;
         K_=dg.K_;
         stamp_ = dg.stamp_;
         kf_ =dg.kf_;
-        sid_ = dg.sid_;
         view_ = dg.view_;
         //sensor_pose_ = dg.sensor_pose_;
         for(auto& elem : detections_){

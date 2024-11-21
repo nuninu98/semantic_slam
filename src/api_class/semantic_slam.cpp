@@ -93,15 +93,15 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     tracking_sync_.reset(new message_filters::Synchronizer<track_sync_pol> (track_sync_pol(10), *tracking_color_, *tracking_depth_));
     tracking_sync_->registerCallback(boost::bind(&SemanticSLAM::trackingImageCallback, this, _1, _2));
 
-    side_depth_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, "/side/aligned_depth_to_color/image_raw", 1));
-    side_yolo_.reset(new message_filters::Subscriber<yolo_protocol::YoloResult> (nh_, "/side/color/image_raw/yolo", 1));
-    side_sync_.reset(new message_filters::Synchronizer<yolo_sync_pol> (yolo_sync_pol(10), *side_depth_, *side_yolo_));
-    side_sync_->registerCallback(boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, _2, sidecam_in_frontcam_, K_side_, 'S'));
+    // side_depth_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, "/side/aligned_depth_to_color/image_raw", 1));
+    // side_yolo_.reset(new message_filters::Subscriber<yolo_protocol::YoloResult> (nh_, "/side/color/image_raw/yolo", 1));
+    // side_sync_.reset(new message_filters::Synchronizer<yolo_sync_pol> (yolo_sync_pol(10), *side_depth_, *side_yolo_));
+    // side_sync_->registerCallback(boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, _2, sidecam_in_frontcam_, K_side_, 'S'));
 
     front_depth_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, depth_topic, 1));
     front_yolo_.reset(new message_filters::Subscriber<yolo_protocol::YoloResult> (nh_, rgb_topic+"/yolo", 1));
     front_sync_.reset(new message_filters::Synchronizer<yolo_sync_pol> (yolo_sync_pol(10), *front_depth_, *front_yolo_));
-    front_sync_->registerCallback(boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, _2, Eigen::Matrix4f::Identity(), K_front_, 'X'));
+    front_sync_->registerCallback(boost::bind(&SemanticSLAM::detectionImageCallback, this, _1, _2, Eigen::Matrix4f::Identity(), K_front_));
 
     record_sub_ = nh_.subscribe("record_flag", 1000, &SemanticSLAM::recordCallback, this);
 
@@ -175,7 +175,7 @@ void SemanticSLAM::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_i
 
 }
 bool init = false;
-void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& depth_image, const yolo_protocol::YoloResultConstPtr& yolo_result, const Eigen::Matrix4f& sensor_pose, const Eigen::Matrix3f& K, char sID){
+void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& depth_image, const yolo_protocol::YoloResultConstPtr& yolo_result, const Eigen::Matrix4f& sensor_pose, const Eigen::Matrix3f& K){
     sensor_msgs::ImageConstPtr color_img = boost::make_shared<sensor_msgs::Image const>(yolo_result->original);
     cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(color_img, "bgr8");
     cv_bridge::CvImageConstPtr cv_depth_bridge = cv_bridge::toCvShare(depth_image, depth_image->encoding);
@@ -207,7 +207,7 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& dept
         }
 
         
-                if(detect.header.frame_id == "desk"){ //temporarily disabled
+        if(detect.header.frame_id == "desk"){ //temporarily disabled
             continue;
         }
         Detection* det_p = new Detection(roi, cv::Mat(), detect.header.frame_id);
@@ -250,7 +250,7 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& dept
     }
    
     if(!detections.empty()){
-        DetectionGroup dg(sensor_pose, detections, K, yolo_result->header.stamp.toSec(), sID);
+        DetectionGroup dg(sensor_pose, detections, K, yolo_result->header.stamp.toSec());
         dg.view_ = cv_rgb_bridge->image.clone();
         object_lock_.lock();
         obj_detection_buf_.push(dg);
@@ -298,7 +298,6 @@ void SemanticSLAM::registerObjects(KeyFrame* kf){
         Eigen::Matrix4f cam_in_map = kf->getPose()* det->getDetectionGroup()->getSensorPose();
         gtsam::Pose3 Twc = gtsam::Pose3(cam_in_map.cast<double>());
 
-        gtsam::Key sensor_id = gtsam::Symbol(det->getDetectionGroup()->sID(), kf->id());
         gtsam_quadrics::ConstrainedDualQuadric dQc = det->Q_;
         gtsam::Pose3 dQc_pose = dQc.pose();
 
@@ -330,7 +329,7 @@ void SemanticSLAM::registerObjects(KeyFrame* kf){
         new_factors_.add(opf);
         gtsam::Vector4 bbox_noise_vec(50.0, 50.0, 50.0, 50.0);
         auto bbox_noise = gtsam::noiseModel::Diagonal::Sigmas(bbox_noise_vec);
-        gtsam_quadrics::BoundingBoxFactor bbf(det->getROI(), K_gtsam, sensor_id, O(new_obj->id()), bbox_noise, gtsam_quadrics::BoundingBoxFactor::TRUNCATED);
+        gtsam_quadrics::BoundingBoxFactor bbf(det->getROI(), K_gtsam, X(kf->id()), O(new_obj->id()), bbox_noise, gtsam_quadrics::BoundingBoxFactor::TRUNCATED);
         new_factors_.add(bbf);
         last_oid_ = new_obj->id();
     }
@@ -428,8 +427,7 @@ void SemanticSLAM::addKeyFrame(KeyFrame* kf, const vector<DetectionGroup>& dgs){
     vector<Object*> tgt_objs = h_graph_.getObjects(kf->getFloor());
     for(auto& det : kf_detections){
         Eigen::Matrix3f K = det->getDetectionGroup()->getIntrinsic();
-        gtsam::Key sensor_id = gtsam::Symbol(det->getDetectionGroup()->sID(), kf->id());
-        //dg->sID() == 'X' ? X(kf->id()) : S(kf->id());
+        gtsam::Key sensor_id = X(kf->id());
         gtsam::Cal3_S2::shared_ptr K_gtsam(new gtsam::Cal3_S2(K(0, 0), K(1, 1), 0.0, K(0, 2), K(1, 2)));
         Eigen::Matrix4f cam_in_map = kf->getPose()* det->getDetectionGroup()->getSensorPose();
         gtsam::Pose3 Twc = gtsam::Pose3(cam_in_map.cast<double>());
@@ -549,7 +547,6 @@ void SemanticSLAM::keyframeCallback(){
 
         double stamp = orb_kf->mTimeStamp;
         vector<DetectionGroup> detection_groups;
-        unordered_map<char, DetectionGroup> id_dg;
 
         object_lock_.lock();
         while(!obj_detection_buf_.empty()){
@@ -558,20 +555,18 @@ void SemanticSLAM::keyframeCallback(){
                 break;
             }
             if(stamp - obj_stamp < 0.1){
-                if(id_dg.find(obj_detection_buf_.front().sID()) == id_dg.end()){
-                    id_dg.insert(make_pair(obj_detection_buf_.front().sID(), obj_detection_buf_.front()));
+                
+                if(detection_groups.empty()){
+                    detection_groups.push_back(obj_detection_buf_.front());
                 }
-                else if(id_dg[obj_detection_buf_.front().sID()].stamp() < obj_stamp){
-                    id_dg[obj_detection_buf_.front().sID()] = obj_detection_buf_.front();
+                else if(detection_groups[0].stamp() < obj_stamp){
+                    detection_groups[0] = obj_detection_buf_.front();
                 }
                 //detection_groups.push_back(obj_detection_buf_.front());
             }
             obj_detection_buf_.pop();
         }
         object_lock_.unlock();
-        for(const auto& elem : id_dg){
-            detection_groups.push_back(elem.second);
-        }
         
         // new_kf->color_ = orb_kf->color_;
         // new_kf->depth_ = orb_kf->depth_;
@@ -765,8 +760,7 @@ void SemanticSLAM::loopQueryCallback(){
                         gtsam::Vector4 bbox_noise_vec(50.0, 50.0, 50.0, 50.0);
                         auto bbox_noise = gtsam::noiseModel::Diagonal::Sigmas(bbox_noise_vec);
                         gtsam::Cal3_S2::shared_ptr K_gtsam(new gtsam::Cal3_S2(K(0, 0), K(1, 1), 0.0, K(0, 2), K(1, 2)));
-                        gtsam::Key sensor_id = gtsam::Symbol(corr.first->getDetectionGroup()->sID(), lq.id_query);
-                        gtsam_quadrics::BoundingBoxFactor bbf(corr.first->getROI(), K_gtsam, sensor_id, O(corr.second->id()), bbox_noise, gtsam_quadrics::BoundingBoxFactor::TRUNCATED);
+                        gtsam_quadrics::BoundingBoxFactor bbf(corr.first->getROI(), K_gtsam, X(lq.id_query), O(corr.second->id()), bbox_noise, gtsam_quadrics::BoundingBoxFactor::TRUNCATED);
                         new_factors_.add(bbf);
                     }
                     gtsam_lock_.unlock();

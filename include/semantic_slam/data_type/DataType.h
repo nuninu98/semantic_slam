@@ -157,19 +157,16 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
             cv::Mat view_;
         private:
             double stamp_;
-            // cv::Mat color_img;
-            // cv::Mat depth_img;
             Eigen::Matrix4f sensor_pose_;
             Eigen::Matrix3f K_;
             vector<Detection*> detections_;
             KeyFrame* kf_;
-            char sid_;
         public:
             DetectionGroup();
 
             DetectionGroup(const DetectionGroup& dg);
 
-            DetectionGroup(const Eigen::Matrix4f& sensor_pose, const vector<Detection*>& detections, const Eigen::Matrix3f& K, double stamp, char sid);
+            DetectionGroup(const Eigen::Matrix4f& sensor_pose, const vector<Detection*>& detections, const Eigen::Matrix3f& K, double stamp);
 
             ~DetectionGroup();
 
@@ -184,8 +181,6 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
             void setKeyFrame(KeyFrame* kf);
 
             KeyFrame* getKeyFrame() const;
-
-            char sID() const;
 
             DetectionGroup& operator=(const DetectionGroup& dg);
 
