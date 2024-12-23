@@ -251,7 +251,9 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& dept
    
     if(!detections.empty()){
         DetectionGroup dg(sensor_pose, detections, K, yolo_result->header.stamp.toSec());
-        dg.view_ = cv_rgb_bridge->image.clone();
+        cv::Mat downsampled;
+        cv::resize(cv_rgb_bridge->image.clone(), downsampled, cv::Size(0, 0), 0.5, 0.5, cv::INTER_NEAREST);
+        dg.view_ = downsampled;
         object_lock_.lock();
         obj_detection_buf_.push(dg);
         object_lock_.unlock();
@@ -1002,7 +1004,7 @@ void SemanticSLAM::findSemanticLoopCandidates(KeyFrame* kf, int N, vector<pair<K
         bool too_close = false;
         for(const auto& pkf_s : output){
             Eigen::Vector3f pkf_trans = pkf_s.first->getPose().block<3, 1>(0, 3);
-            if((kf_trans - pkf_trans).norm() < 3.0){
+            if((kf_trans - pkf_trans).norm() < 2.0){
                 too_close = true;
                 break;
             }
