@@ -113,7 +113,18 @@
 
         gtsam::Pose3 pose(transform3.matrix().cast<double>());
         Q_= gtsam_quadrics::ConstrainedDualQuadric(pose, box_dim.cast<double>()/ 2.0);
-        // return Q;
+        
+        //============Depth Quadric (fake)=====================
+        auto box_center = getROI().center();
+        double box_depth = depth_scaled.at<float>((int)box_center.y(), (int)box_center.x());
+        double x = (box_center.x() - K(0, 2))*box_depth / K(0, 0);
+        double y = (box_center.y() - K(1, 2))*box_depth / K(1, 1);
+
+        double tx = (getROI().xmin() - K(0, 2))*box_depth / K(0, 0);
+        double ty = (getROI().ymin() - K(1, 2))*box_depth / K(1, 1);
+        gtsam::Vector3 radii(abs(tx -x), abs(ty - y), 0.1);
+        depth_Q_ = gtsam_quadrics::ConstrainedDualQuadric(gtsam::Pose3::identity(), radii);
+        //=====================================================
     }
 
     // void Detection::getCloud(pcl::PointCloud<pcl::PointXYZRGB>& output) const{

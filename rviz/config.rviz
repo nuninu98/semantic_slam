@@ -12,7 +12,7 @@ Panels:
         - /PointCloud22
         - /MarkerArray1
       Splitter Ratio: 0.5
-    Tree Height: 196
+    Tree Height: 441
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -89,65 +89,29 @@ Visualization Manager:
         All Enabled: true
         base_link:
           Value: true
-        chair28:
-          Value: true
         chair29:
           Value: true
         chair30:
           Value: true
         chair31:
           Value: true
-        chair32:
-          Value: true
-        chair34:
-          Value: true
-        chair46:
-          Value: true
-        chair49:
-          Value: true
-        chair53:
-          Value: true
         chair57:
-          Value: true
-        chair58:
-          Value: true
-        chair59:
-          Value: true
-        exit37:
           Value: true
         exit38:
           Value: true
         exit39:
           Value: true
-        exit40:
-          Value: true
-        exit46:
+        exit43:
           Value: true
         exit47:
           Value: true
-        exit48:
-          Value: true
-        exit49:
-          Value: true
-        exit51:
-          Value: true
         exit60:
           Value: true
-        exit61:
-          Value: true
-        exit62:
-          Value: true
         extinguisher1:
-          Value: true
-        extinguisher10:
           Value: true
         extinguisher11:
           Value: true
         extinguisher12:
-          Value: true
-        extinguisher13:
-          Value: true
-        extinguisher19:
           Value: true
         extinguisher2:
           Value: true
@@ -155,51 +119,21 @@ Visualization Manager:
           Value: true
         extinguisher21:
           Value: true
-        extinguisher22:
-          Value: true
-        extinguisher3:
-          Value: true
-        extinguisher34:
-          Value: true
         extinguisher35:
           Value: true
         extinguisher36:
-          Value: true
-        extinguisher37:
           Value: true
         extinguisher44:
           Value: true
         extinguisher46:
           Value: true
-        extinguisher49:
-          Value: true
         extinguisher50:
-          Value: true
-        extinguisher51:
-          Value: true
-        extinguisher52:
-          Value: true
-        extinguisher54:
           Value: true
         extinguisher55:
           Value: true
-        extinguisher56:
-          Value: true
-        extinguisher57:
-          Value: true
-        extinguisher60:
+        extinguisher58:
           Value: true
         extinguisher64:
-          Value: true
-        extinguisher65:
-          Value: true
-        extinguisher66:
-          Value: true
-        extinguisher71:
-          Value: true
-        extinguisher72:
-          Value: true
-        extinguisher76:
           Value: true
         map:
           Value: true
@@ -231,8 +165,6 @@ Visualization Manager:
           Value: true
         room_sign2:
           Value: true
-        room_sign20:
-          Value: true
         room_sign21:
           Value: true
         room_sign22:
@@ -252,8 +184,6 @@ Visualization Manager:
         room_sign29:
           Value: true
         room_sign3:
-          Value: true
-        room_sign30:
           Value: true
         room_sign31:
           Value: true
@@ -319,19 +249,13 @@ Visualization Manager:
           Value: true
         room_sign6:
           Value: true
-        room_sign60:
-          Value: true
         room_sign61:
           Value: true
         room_sign62:
           Value: true
         room_sign63:
           Value: true
-        room_sign64:
-          Value: true
         room_sign65:
-          Value: true
-        room_sign66:
           Value: true
         room_sign67:
           Value: true
@@ -341,7 +265,7 @@ Visualization Manager:
           Value: true
         room_sign7:
           Value: true
-        room_sign70:
+        room_sign71:
           Value: true
         room_sign72:
           Value: true
@@ -353,27 +277,7 @@ Visualization Manager:
           Value: true
         room_sign76:
           Value: true
-        room_sign77:
-          Value: true
-        room_sign78:
-          Value: true
-        room_sign79:
-          Value: true
         room_sign8:
-          Value: true
-        room_sign80:
-          Value: true
-        room_sign81:
-          Value: true
-        room_sign82:
-          Value: true
-        room_sign83:
-          Value: true
-        room_sign84:
-          Value: true
-        room_sign85:
-          Value: true
-        room_sign86:
           Value: true
         room_sign9:
           Value: true
@@ -383,53 +287,25 @@ Visualization Manager:
           Value: true
         trashcan41:
           Value: true
-        trashcan42:
-          Value: true
-        wall_exinguisher18:
+        trashcan52:
           Value: true
         wall_exinguisher19:
           Value: true
         wall_exinguisher20:
           Value: true
-        wall_exinguisher21:
-          Value: true
-        wall_exinguisher42:
-          Value: true
-        wall_exinguisher45:
+        wall_exinguisher41:
           Value: true
         wall_exinguisher46:
           Value: true
-        wall_exinguisher47:
-          Value: true
-        wall_exinguisher48:
-          Value: true
-        wall_exinguisher5:
-          Value: true
-        wall_exinguisher50:
-          Value: true
-        wall_exinguisher53:
-          Value: true
         wall_exinguisher54:
-          Value: true
-        wall_exinguisher55:
           Value: true
         wall_exinguisher6:
           Value: true
-        wall_exinguisher61:
-          Value: true
         wall_exinguisher66:
-          Value: true
-        wall_exinguisher67:
-          Value: true
-        wall_exinguisher68:
           Value: true
         wall_exinguisher7:
           Value: true
         wall_exinguisher70:
-          Value: true
-        wall_exinguisher71:
-          Value: true
-        wall_exinguisher8:
           Value: true
       Marker Alpha: 1
       Marker Scale: 1
@@ -438,279 +314,187 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        chair28:
+        base_link:
           {}
         chair29:
           {}
-        chair32:
+        chair30:
           {}
-        chair34:
-          {}
-        chair46:
-          {}
-        chair49:
-          {}
-        chair53:
+        chair31:
           {}
         chair57:
           {}
-        chair59:
-          {}
-        exit37:
-          {}
         exit38:
           {}
-        exit40:
+        exit39:
           {}
-        exit46:
+        exit43:
           {}
         exit47:
           {}
-        exit49:
-          {}
-        exit51:
-          {}
         exit60:
-          {}
-        exit62:
           {}
         extinguisher1:
           {}
-        extinguisher10:
-          {}
         extinguisher11:
           {}
-        extinguisher13:
+        extinguisher12:
           {}
-        extinguisher19:
+        extinguisher2:
           {}
         extinguisher20:
           {}
-        extinguisher22:
-          {}
-        extinguisher3:
-          {}
-        extinguisher34:
+        extinguisher21:
           {}
         extinguisher35:
           {}
-        extinguisher37:
+        extinguisher36:
           {}
         extinguisher44:
           {}
         extinguisher46:
           {}
-        extinguisher49:
-          {}
         extinguisher50:
-          {}
-        extinguisher52:
-          {}
-        extinguisher54:
           {}
         extinguisher55:
           {}
-        extinguisher57:
-          {}
-        extinguisher60:
+        extinguisher58:
           {}
         extinguisher64:
           {}
-        extinguisher66:
-          {}
-        extinguisher71:
-          {}
-        extinguisher72:
-          {}
-        extinguisher76:
-          {}
         map:
-          map_optic:
-            base_link:
-              {}
-            chair30:
-              {}
-            chair31:
-              {}
-            chair58:
-              {}
-            exit39:
-              {}
-            exit48:
-              {}
-            exit61:
-              {}
-            extinguisher12:
-              {}
-            extinguisher2:
-              {}
-            extinguisher21:
-              {}
-            extinguisher36:
-              {}
-            extinguisher51:
-              {}
-            extinguisher56:
-              {}
-            extinguisher65:
-              {}
-            room_sign0:
-              {}
-            room_sign1:
-              {}
-            room_sign10:
-              {}
-            room_sign11:
-              {}
-            room_sign13:
-              {}
-            room_sign14:
-              {}
-            room_sign15:
-              {}
-            room_sign16:
-              {}
-            room_sign17:
-              {}
-            room_sign18:
-              {}
-            room_sign19:
-              {}
-            room_sign22:
-              {}
-            room_sign23:
-              {}
-            room_sign24:
-              {}
-            room_sign25:
-              {}
-            room_sign26:
-              {}
-            room_sign27:
-              {}
-            room_sign28:
-              {}
-            room_sign29:
-              {}
-            room_sign3:
-              {}
-            room_sign32:
-              {}
-            room_sign33:
-              {}
-            room_sign34:
-              {}
-            room_sign35:
-              {}
-            room_sign37:
-              {}
-            room_sign38:
-              {}
-            room_sign4:
-              {}
-            room_sign40:
-              {}
-            room_sign42:
-              {}
-            room_sign43:
-              {}
-            room_sign44:
-              {}
-            room_sign45:
-              {}
-            room_sign46:
-              {}
-            room_sign49:
-              {}
-            room_sign5:
-              {}
-            room_sign50:
-              {}
-            room_sign52:
-              {}
-            room_sign53:
-              {}
-            room_sign55:
-              {}
-            room_sign57:
-              {}
-            room_sign59:
-              {}
-            room_sign6:
-              {}
-            room_sign60:
-              {}
-            room_sign62:
-              {}
-            room_sign63:
-              {}
-            room_sign64:
-              {}
-            room_sign66:
-              {}
-            room_sign68:
-              {}
-            room_sign69:
-              {}
-            room_sign70:
-              {}
-            room_sign72:
-              {}
-            room_sign8:
-              {}
-            room_sign9:
-              {}
-            trashcan41:
-              {}
-            wall_exinguisher20:
-              {}
-            wall_exinguisher47:
-              {}
-            wall_exinguisher54:
-              {}
-            wall_exinguisher67:
-              {}
-            wall_exinguisher7:
-              {}
-            wall_exinguisher71:
-              {}
+          {}
+        map_optic:
+          {}
+        room_sign0:
+          {}
+        room_sign1:
+          {}
+        room_sign10:
+          {}
+        room_sign11:
+          {}
         room_sign12:
+          {}
+        room_sign13:
+          {}
+        room_sign14:
+          {}
+        room_sign15:
+          {}
+        room_sign16:
+          {}
+        room_sign17:
+          {}
+        room_sign18:
+          {}
+        room_sign19:
           {}
         room_sign2:
           {}
-        room_sign20:
-          {}
         room_sign21:
           {}
-        room_sign30:
+        room_sign22:
+          {}
+        room_sign23:
+          {}
+        room_sign24:
+          {}
+        room_sign25:
+          {}
+        room_sign26:
+          {}
+        room_sign27:
+          {}
+        room_sign28:
+          {}
+        room_sign29:
+          {}
+        room_sign3:
           {}
         room_sign31:
           {}
+        room_sign32:
+          {}
+        room_sign33:
+          {}
+        room_sign34:
+          {}
+        room_sign35:
+          {}
         room_sign36:
+          {}
+        room_sign37:
+          {}
+        room_sign38:
           {}
         room_sign39:
           {}
+        room_sign4:
+          {}
+        room_sign40:
+          {}
         room_sign41:
+          {}
+        room_sign42:
+          {}
+        room_sign43:
+          {}
+        room_sign44:
+          {}
+        room_sign45:
+          {}
+        room_sign46:
           {}
         room_sign47:
           {}
         room_sign48:
           {}
+        room_sign49:
+          {}
+        room_sign5:
+          {}
+        room_sign50:
+          {}
         room_sign51:
+          {}
+        room_sign52:
+          {}
+        room_sign53:
           {}
         room_sign54:
           {}
+        room_sign55:
+          {}
         room_sign56:
+          {}
+        room_sign57:
           {}
         room_sign58:
           {}
+        room_sign59:
+          {}
+        room_sign6:
+          {}
         room_sign61:
+          {}
+        room_sign62:
+          {}
+        room_sign63:
           {}
         room_sign65:
           {}
         room_sign67:
           {}
+        room_sign68:
+          {}
+        room_sign69:
+          {}
         room_sign7:
+          {}
+        room_sign71:
+          {}
+        room_sign72:
           {}
         room_sign73:
           {}
@@ -720,65 +504,35 @@ Visualization Manager:
           {}
         room_sign76:
           {}
-        room_sign77:
+        room_sign8:
           {}
-        room_sign78:
-          {}
-        room_sign79:
-          {}
-        room_sign80:
-          {}
-        room_sign81:
-          {}
-        room_sign82:
-          {}
-        room_sign83:
-          {}
-        room_sign84:
-          {}
-        room_sign85:
-          {}
-        room_sign86:
+        room_sign9:
           {}
         trashcan39:
           {}
         trashcan40:
           {}
-        trashcan42:
+        trashcan41:
           {}
-        wall_exinguisher18:
+        trashcan52:
           {}
         wall_exinguisher19:
           {}
-        wall_exinguisher21:
+        wall_exinguisher20:
           {}
-        wall_exinguisher42:
-          {}
-        wall_exinguisher45:
+        wall_exinguisher41:
           {}
         wall_exinguisher46:
           {}
-        wall_exinguisher48:
-          {}
-        wall_exinguisher5:
-          {}
-        wall_exinguisher50:
-          {}
-        wall_exinguisher53:
-          {}
-        wall_exinguisher55:
+        wall_exinguisher54:
           {}
         wall_exinguisher6:
           {}
-        wall_exinguisher61:
-          {}
         wall_exinguisher66:
           {}
-        wall_exinguisher68:
+        wall_exinguisher7:
           {}
         wall_exinguisher70:
-          {}
-        wall_exinguisher8:
           {}
       Update Interval: 0
       Value: true
@@ -909,7 +663,7 @@ Visualization Manager:
       Marker Topic: /hierarchy_graph
       Name: MarkerArray
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Alpha: 1
@@ -972,7 +726,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 111.62737274169922
+      Distance: 65.97845458984375
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -980,9 +734,9 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 30.107128143310547
-        Y: 10.621463775634766
-        Z: -15.617003440856934
+        X: 34.36652755737305
+        Y: 17.20047378540039
+        Z: -15.547466278076172
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
@@ -990,7 +744,7 @@ Visualization Manager:
       Near Clip Distance: 0.009999999776482582
       Pitch: 1.5697963237762451
       Target Frame: <Fixed Frame>
-      Yaw: 4.26541805267334
+      Yaw: 4.810420989990234
     Saved: ~
 Window Geometry:
   Camera:

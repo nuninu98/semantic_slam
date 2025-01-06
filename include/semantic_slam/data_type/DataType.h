@@ -97,6 +97,7 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
             gtsam_quadrics::ConstrainedDualQuadric Q_;
             void calcInitQuadric(const cv::Mat& depth_scaled, const cv::Mat& mask, const Eigen::Matrix3f& K);
 
+            gtsam_quadrics::ConstrainedDualQuadric depth_Q_;
         private:
             Object* matched_obj_ = nullptr;
             cv::Rect roi_;

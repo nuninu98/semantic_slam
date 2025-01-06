@@ -67,12 +67,12 @@ plt.ylim(-5, 40)
 plt.legend()
 
 plt.figure(3)
-loop_scores = np.loadtxt("/home/nuninu98/match_test/2940/scores.txt")
+loop_scores = np.loadtxt("/home/nuninu98/match_test/2950/scores.txt")
 ids = loop_scores[:,0]
 ids = np.asarray(ids, dtype=int)
 plt.plot(proposed[:,0], proposed[:, 1], '-r', label="Trajectory")
 plt.plot(proposed[ids, 0], proposed[ids, 1], 'yo', label='Loop Candidates')
-qid = 2940
+qid = 2950
 ki = 0
 for id in ids:
     plt.text(proposed[id, 0], proposed[id, 1], ki)
@@ -101,8 +101,9 @@ plt.ylabel('y [m]')
 plt.legend()
 
 plt.figure(4)
-plt.plot(loop_scores[:, 1], label='Proposed Method')
-plt.plot(1.0 - loop_scores[:, 2], label= 'VBoW Method')
+plt.plot(loop_scores[:, 1],'-ro' ,label='Proposed Method')
+plt.plot(loop_scores[:, 2], '-bo', label= 'VBoW')
+plt.plot(loop_scores[:, 3], '-go', label= 'Shape Comparison (SmSLAM+LCD)')
 plt.title('Loop Validation Score')
 plt.legend()
 plt.xlabel('Keyframe')

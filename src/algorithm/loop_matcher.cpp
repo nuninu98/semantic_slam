@@ -595,13 +595,10 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
     cp_model.Minimize(total_cost);
     operations_research::sat::CpSolverResponse result = operations_research::sat::Solve(cp_model.Build());
     if(result.status() == operations_research::sat::CpSolverStatus::INFEASIBLE){
-        cout<<"2nd failed. INFI"<<endl;
         return false;
     }
     double result_cost = result.objective_value();
-    cout<<"RESULT? "<<result_cost<<endl;
     if(result_cost < 1.0e-3 ){ // temporarily block error. 
-        cout<<"2nd failed. COST: "<<result_cost<<endl;
         return false;
     }
 
@@ -666,11 +663,13 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
         graph.add(bbf);
     }
     
+    double unmatch_rate = 0.0;
     gtsam::LevenbergMarquardtOptimizer optim(graph, init);
     gtsam::Values opt = optim.optimize();
     opt_pose = opt.at<gtsam::Pose3>(X(qkf->id())).matrix();
     //-------Debug---------
     unordered_set<Object*> matched_aft;
+    
     for(int i = 0; i < corrs.size(); ++i){
         auto cor = corrs[i];        
         const DetectionGroup* dg = qkf_dets[cor.first]->getDetectionGroup();
@@ -685,7 +684,18 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
         cv::rectangle(qkf_view_aft, qkf_dets[cor.first]->getROI_CV(), cv::Scalar(0, 0, 255), 2);
         cv::putText(qkf_view_aft, to_string(i), qkf_dets[cor.first]->getROI_CV().tl(), 1, 2, cv::Scalar(0, 0, 255), 2);
         matched_aft.insert(objects[cor.second]);
+
+        // gtsam_quadrics::AlignedBox2 bbox_act = qkf_dets[cor.first]->getROI();
+        // double l1 = sqrt(pow(bbox_est.width(), 2) + pow(bbox_est.height(), 2));
+        // double l2 = sqrt(pow(bbox_act.width(), 2) + pow(bbox_act.height(), 2));
+        // double shape_diff_rate = abs(l1- l2) / max(l1, l2);
+        gtsam_quadrics::ConstrainedDualQuadric Q_det = qkf_dets[cor.first]->depth_Q_;
+        double l1 = Q_det.radii().norm();//Q_det.radii().norm();
+        double l2 = objects[cor.second]->Q().radii().norm();
+        double shape_diff_rate = abs(l1- l2) / max(l1, l2);
+        unmatch_rate += shape_diff_rate;
     }
+
 
     unordered_map<Object*, gtsam_quadrics::AlignedBox2> visibles_aft;
     extractiVisibles(objects, K, opt_pose, visibles_aft);
@@ -698,7 +708,6 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
         //cv::putText(qkf_gray_aft, om_pair.first->getClassName(), est_cv.tl(),1, 1,cv::Scalar(255, 0, 0));
     }
     double err = optim.error();
-    cout<<"ERR: "<<err<<endl;
     // string folder = "/home/nuninu98/match_test/"+to_string(qkf->id())+"/";
     // if(!boost::filesystem::exists(folder)){
     //     boost::filesystem::create_directories(folder);
@@ -720,7 +729,7 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
     }
     ofstream txtfile;
     txtfile.open(folder + "scores.txt", ios_base::app);
-    txtfile<<tkf->id()<<" "<< fvec_err<<" "<< l1score<<endl;
+    txtfile<<tkf->id()<<" "<< fvec_err<<" "<< l1score <<" "<<(unmatch_rate / corrs.size())<<endl;
     if(!boost::filesystem::exists(folder + to_string(qkf->id()) + ".png")){
         cv::imwrite(folder + to_string(qkf->id()) + ".png", qkf_dets[0]->getDetectionGroup()->view_.clone());
     }
