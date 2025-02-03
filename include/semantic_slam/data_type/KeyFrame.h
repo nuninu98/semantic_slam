@@ -12,6 +12,7 @@ class KeyFrame{
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         DBoW2::BowVector bow_vec;
+        double stamp;
         //===Visualization===
         // cv::Mat color_;
         // cv::Mat depth_;

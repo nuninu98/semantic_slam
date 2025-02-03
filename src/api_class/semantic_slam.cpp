@@ -574,6 +574,7 @@ void SemanticSLAM::keyframeCallback(){
         // new_kf->depth_ = orb_kf->depth_;
         gtsam_lock_.lock();
         KeyFrame* new_kf = new KeyFrame(orb_kf->mnId, orb_kf->GetPoseInverse().matrix());
+        new_kf->stamp = ros::Time::now().toSec();
         if(last_key_ != nullptr){
             Eigen::Matrix4f pose_tmp = last_key_->getPose() * (last_key_->getOdomPose().inverse() * orb_kf->GetPoseInverse().matrix());
             new_kf->setPose(pose_tmp);
@@ -1055,7 +1056,7 @@ void SemanticSLAM::recordCallback(const std_msgs::BoolConstPtr& msg){
             continue;
         }
         Eigen::Matrix4f se3 = OPTIC_TF* kf->getPose();
-        traj_file << se3(0, 3)<<" "<<se3(1, 3)<<endl;
+        traj_file <<to_string(kf->stamp)<<" "<< se3(0, 3)<<" "<<se3(1, 3)<<" "<<se3(2, 3)<<endl;
     }
 
     string loop_filename= "proposed_loop.txt";

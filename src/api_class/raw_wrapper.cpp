@@ -102,6 +102,7 @@ void RawWrapper::keyframeCallback(){
         sort(keyframes.begin(), keyframes.end(), []( ORB_SLAM3::KeyFrame* k1,  ORB_SLAM3::KeyFrame* k2){
             return k1->mnId < k2->mnId;
         });
+        stamp_.insert({keyframes.back()->mnId, ros::Time::now().toSec()});
         nav_msgs::Path path;
         path.header.frame_id = "map_optic";
         path.header.stamp = ros::Time::now();
@@ -200,9 +201,13 @@ void RawWrapper::recordCallback(const std_msgs::BoolConstPtr& msg){
         return k1->mnId < k2->mnId;
     });
     for(size_t i = 0; i < keyframes.size(); ++i){
+        if(stamp_.find(keyframes[i]->mnId) == stamp_.end()){
+            cout<<"DROP? "<<endl;
+            continue;
+        }
         
         Eigen::Matrix4f se3 = OPTIC_TF* keyframes[i]->GetPoseInverse().matrix();
-        traj_file << se3(0, 3)<<" "<<se3(1, 3)<<endl;
+        traj_file <<to_string(stamp_[keyframes[i]->mnId])<<" "<< se3(0, 3)<<" "<<se3(1, 3)<<" "<<se3(2, 3)<<endl;
     }
 
     filename = "orbslam_loop.txt";
