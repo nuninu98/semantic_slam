@@ -317,11 +317,11 @@ bool LoopMatcher::matchStep1(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, Eige
         return p1.second > p2.second;
     });
     dets_unique = {dets_sort[0]};
-    for(int i = 1; i < dets_sort.size(); ++i){
-        if(dets_sort[i].second > 0.1){
-            dets_unique.push_back(dets_sort[i]);
-        }
-    }
+    // for(int i = 1; i < dets_sort.size(); ++i){
+    //     if(dets_sort[i].second > 0.1){
+    //         dets_unique.push_back(dets_sort[i]);
+    //     }
+    // }
 
     gtsam::NonlinearFactorGraph base_graph;
     gtsam::Values base_init;
@@ -401,7 +401,7 @@ bool LoopMatcher::matchStep1(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, Eige
         }
         double result_cost = result.objective_value();
 
-        if(result_cost < 1.0e-8 || result_cost > 1.0e8){ // temporarily block error. 
+        if(result_cost < 1.0e-8 || result_cost > 1.0e8){ // temporarily block error.
             return false;
         }
 
@@ -467,7 +467,6 @@ bool LoopMatcher::matchStep1(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, Eige
         gtsam::Values opt = optim.optimize();
         opt_pose = opt.at<gtsam::Pose3>(X(qkf->id())).matrix();
         err = optim.error();
-
         // qkf_view_aft = qkf_dets[0]->getDetectionGroup()->view_.clone();
         // for(const auto& obj : h_graph.getObjects(qkf->getFloor())){
         //     const DetectionGroup* dg = qkf_dets[0]->getDetectionGroup();
@@ -603,7 +602,6 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
     }
 
 
-
     vector<pair<int, int>> corrs;
     for(int j = 0; j < x[0].size(); ++j){
         for(int i = 0; i < x.size(); ++i){
@@ -719,8 +717,7 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
     
     score = err;
     double fvec_err = 1000.0;
-    bool same_pattern = patternMatched(visibles_prev, visibles_aft, fvec_err);
-    
+    bool same_pattern = true;//patternMatched(visibles_prev, visibles_aft, fvec_err);
     //=============Debug validation===================
     double l1score = L1Score(qkf->bow_vec, tkf->bow_vec);
     string folder = "/home/nuninu98/match_test/"+to_string(qkf->id())+"/";
@@ -881,10 +878,11 @@ bool LoopMatcher::match3(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, LoopMatc
     unique_lock<mutex> lock(lock_);
     Eigen::Matrix4d opt_pose = qkf->getPose().cast<double>();
     vector<pair<Detection*, Object*>> unique_matches;
-    cout<<"MATCH "<<qkf->id()<<" "<<tkf->id()<<endl;
-    if(!matchStep1(qkf, tkf, h_graph, opt_pose, unique_matches)){
-        return false;
-    }
+    //cout<<"MATCH "<<qkf->id()<<" "<<tkf->id()<<endl;
+    // if(!matchStep1(qkf, tkf, h_graph, opt_pose, unique_matches)){
+    //     //cout<<"SIBAL"<<endl;
+    //     return false;
+    // }
     
     double score = 0.0;
     bool result = matchStep2(qkf, tkf, h_graph, unique_matches, opt_pose, score, output.object_matches);
@@ -892,6 +890,6 @@ bool LoopMatcher::match3(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, LoopMatc
     output.score = score;
     output.query = qkf->id();
     output.target = tkf->id();
-    output.unique_obj = unique_matches[0].second;
+    output.unique_obj = nullptr;//unique_matches[0].second;
     return result;
 }

@@ -180,13 +180,14 @@ void HGraph::updatePoses(const gtsam::Values& opt_stats){
 
 float HGraph::getUScore(Floor* floor, string class_name){
     unique_lock<mutex> lock(lock_);
-    if(fl_name_objs_.find(floor) == fl_name_objs_.end()){
-        return -1.0;
-    }
-    if(fl_name_objs_[floor].find(class_name) == fl_name_objs_[floor].end()){
-        return -1.0;
-    }
-    return 1.0 / fl_name_objs_[floor][class_name].size();
+    return 1.0;
+    // if(fl_name_objs_.find(floor) == fl_name_objs_.end()){
+    //     return -1.0;
+    // }
+    // if(fl_name_objs_[floor].find(class_name) == fl_name_objs_[floor].end()){
+    //     return -1.0;
+    // }
+    // return 1.0 / fl_name_objs_[floor][class_name].size();
 }
 
 KeyFrame* HGraph::getKeyFrame(size_t id){

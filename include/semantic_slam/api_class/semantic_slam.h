@@ -165,6 +165,7 @@ class SemanticSLAM{
         void recordCallback(const std_msgs::BoolConstPtr& msg);
         
         vector<LoopMatchResult> loops_;
+        vector<LoopMatchResult> TPs_, FPs_;
     
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
