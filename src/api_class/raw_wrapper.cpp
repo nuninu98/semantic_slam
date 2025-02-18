@@ -141,7 +141,7 @@ void RawWrapper::loopQueryCallback(){
         while(!lc_buf_.empty()){
             ORB_SLAM3::LoopQuery lq = lc_buf_.front();
             if(lq.type == ORB_SLAM3::LOOP_TYPE::BAG_OF_WORDS){
-                loops_.push_back({lq.id_query, lq.id_target});
+                //loops_.push_back({lq.id_query, lq.id_target});
                 // if(kfID_room_[lq.id_query] != kfID_room_[lq.id_target] && (!kfID_room_[lq.id_query].empty() && !kfID_room_[lq.id_target].empty())){
                 //     cout<<"DIFF ROOM: "<<kfID_room_[lq.id_query]<<" "<<kfID_room_[lq.id_target]<<endl;
                 //     string folder = "/home/nuninu98/test_orbloop/"+to_string(lq.id_query)+"/";
@@ -197,6 +197,9 @@ void RawWrapper::recordCallback(const std_msgs::BoolConstPtr& msg){
     string filename = "orbslam.txt";
     ofstream traj_file(folder + filename);
     vector<ORB_SLAM3::KeyFrame*> keyframes = visual_odom_->getKeyFrames();
+    pcl::PointCloud<pcl::PointXYZI>::Ptr map_cloud(new pcl::PointCloud<pcl::PointXYZI>());
+
+
     sort(keyframes.begin(), keyframes.end(), []( ORB_SLAM3::KeyFrame* k1,  ORB_SLAM3::KeyFrame* k2){
         return k1->mnId < k2->mnId;
     });
@@ -205,7 +208,17 @@ void RawWrapper::recordCallback(const std_msgs::BoolConstPtr& msg){
             cout<<"DROP? "<<endl;
             continue;
         }
-        
+        set<ORB_SLAM3::MapPoint*> pts = keyframes[i]->GetMapPoints();
+        for(auto& orb_pt : pts){
+            Eigen::Vector4f optic_pose = Eigen::Vector4f::Ones();
+            optic_pose.block<3, 1>(0, 0) = orb_pt->GetWorldPos();
+            Eigen::Vector4f world_pose = OPTIC_TF * optic_pose;
+            pcl::PointXYZI pt;
+            pt.x = world_pose(0);
+            pt.y = world_pose(1);
+            pt.z = world_pose(2);
+            map_cloud->push_back(pt);
+        }
         Eigen::Matrix4f se3 = OPTIC_TF* keyframes[i]->GetPoseInverse().matrix();
         traj_file <<to_string(stamp_[keyframes[i]->mnId])<<" "<< se3(0, 3)<<" "<<se3(1, 3)<<" "<<se3(2, 3)<<endl;
     }
@@ -217,5 +230,12 @@ void RawWrapper::recordCallback(const std_msgs::BoolConstPtr& msg){
         loop_file << loops_[i].first<<" "<<loops_[i].second<<endl;
     }
     loop_lock_.unlock();
+    
+    // pcl::VoxelGrid<pcl::PointXYZI> vox;
+    // vox.setInputCloud (map_cloud);
+    // vox.setLeafSize (0.2, 0.2, 0.2);
+    // vox.filter(*map_cloud);
+    pcl::io::savePCDFileASCII (folder+"orbslam_map.pcd", *map_cloud);
+
     cout<<"WRITTEN!"<<endl;
 }

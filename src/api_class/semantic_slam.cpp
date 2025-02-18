@@ -1066,5 +1066,38 @@ void SemanticSLAM::recordCallback(const std_msgs::BoolConstPtr& msg){
         Eigen::Matrix4f se3_centroid = OPTIC_TF * centroid;
         loops_file<<loops_[i].query<<" "<<loops_[i].target<<" "<<se3_centroid(0, 3)<<" "<<se3_centroid(1, 3)<<" "<<se3_centroid(2, 3)<<endl;
     }
+
+    pcl::PointCloud<pcl::PointXYZI>::Ptr map_cloud(new pcl::PointCloud<pcl::PointXYZI>());
+    vector<ORB_SLAM3::KeyFrame*> keyframes = visual_odom_->getKeyFrames();
+    sort(keyframes.begin(), keyframes.end(), []( ORB_SLAM3::KeyFrame* k1,  ORB_SLAM3::KeyFrame* k2){
+        return k1->mnId < k2->mnId;
+    });
+    for(size_t i = 0; i < last_key_->id(); ++i){
+        auto kf = h_graph_.getKeyFrame(i);
+        if(kf == nullptr){
+            continue;
+        }
+        auto it = find_if(keyframes.begin(), keyframes.end(), [kf](ORB_SLAM3::KeyFrame* okf){
+            return okf->mnId == kf->id();
+        });
+        if(it == keyframes.end()){
+            continue;
+        }
+        set<ORB_SLAM3::MapPoint*> pts = (*it)->GetMapPoints();
+        for(auto& orb_pt : pts){
+            Eigen::Vector4f nonOptimWorldPose = Eigen::Vector4f::Ones();
+            nonOptimWorldPose.block<3, 1>(0, 0) = orb_pt->GetWorldPos();
+            Eigen::Vector4f rel_pose = (*it)->GetPose() * nonOptimWorldPose;
+            Eigen::Vector4f world_pose = OPTIC_TF * (kf->getPose() * rel_pose);
+            pcl::PointXYZI pt;
+            pt.x = world_pose(0);
+            pt.y = world_pose(1);
+            pt.z = world_pose(2);
+            map_cloud->push_back(pt);
+        }
+        Eigen::Matrix4f se3 = OPTIC_TF* kf->getPose();
+        traj_file <<to_string(kf->stamp)<<" "<< se3(0, 3)<<" "<<se3(1, 3)<<" "<<se3(2, 3)<<endl;
+    }
+     pcl::io::savePCDFileASCII (folder+"proposed_map.pcd", *map_cloud);
     cout<<"WRITTEN!"<<endl;
 }
