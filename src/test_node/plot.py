@@ -98,8 +98,8 @@ for i in range(len(orbslam_loop)):
 
 plt.plot(orbslam_map_points[:,0], orbslam_map_points[:, 1], '.k', label="test", markersize=0.1, alpha=1.0, zorder=0)
 
-plt.xlim(-10, 80)
-plt.ylim(-10, 50)
+# plt.xlim(-10, 80)
+# plt.ylim(-10, 50)
 plt.legend()
 
 plt.figure(2)

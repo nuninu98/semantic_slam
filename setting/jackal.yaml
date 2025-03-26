@@ -93,4 +93,4 @@ Viewer.ViewpointY: -0.7
 Viewer.ViewpointZ: -3.5
 Viewer.ViewpointF: 500.0
 
-loopClosing: 1
+loopClosing: 0

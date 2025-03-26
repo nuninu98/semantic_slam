@@ -32,7 +32,7 @@ RawWrapper::RawWrapper(): pnh_("~"), kf_updated_(false), kill_flag_(false), thre
 
     //sub_yolo_  = nh_.subscribe("/side/color/image_raw/yolo", 1, &RawWrapper::detectionImageCallback, this);
 
-    tracking_color_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, rgb_topic, 1));
+    tracking_color_.reset(new message_filters::Subscriber<sensor_msgs::CompressedImage> (nh_, rgb_topic, 1));
     tracking_depth_.reset(new message_filters::Subscriber<sensor_msgs::Image> (nh_, depth_topic, 1));
     tracking_sync_.reset(new message_filters::Synchronizer<sync_pol> (sync_pol(1000), *tracking_color_, *tracking_depth_));
     tracking_sync_->registerCallback(boost::bind(&RawWrapper::trackingImageCallback, this, _1, _2));
@@ -47,9 +47,10 @@ RawWrapper::~RawWrapper(){
     visual_odom_->Shutdown();
 }
 
-void RawWrapper::trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image){
+void RawWrapper::trackingImageCallback(const sensor_msgs::CompressedImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image){
     ros::Time stamp = rgb_image->header.stamp;
-    cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(rgb_image, "bgr8");
+    //cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(rgb_image, "bgr8");
+    cv_bridge::CvImagePtr cv_rgb_bridge = cv_bridge::toCvCopy(rgb_image, "bgr8");
     cv_bridge::CvImageConstPtr cv_depth_bridge = cv_bridge::toCvShare(depth_image, depth_image->encoding);
     keyframe_lock_.lock();
     Eigen::Matrix4f act_pose = visual_odom_->TrackRGBD(cv_rgb_bridge->image, cv_depth_bridge->image, stamp.toSec()).matrix().inverse();

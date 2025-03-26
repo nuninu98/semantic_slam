@@ -5,7 +5,7 @@ proposed_loop = np.loadtxt("/home/nuninu98/proposed_loop.txt")
 orbslam = np.loadtxt("/home/nuninu98/orbslam.txt")
 smslam = np.loadtxt("/home/nuninu98/smslam.txt")
 
-gt = np.loadtxt("/home/nuninu98/gt.txt")
+gt = np.loadtxt("/home/nuninu98/gt_gazebo.txt")
 time_min = gt[0, 0]
 time_max = gt[ np.shape(gt)[0] - 1,0]
 print(time_min, time_max)
@@ -46,24 +46,24 @@ def rmse(data, ground_truth):
         if stamp < time_min or stamp > time_max:
             continue
         id = 0
-        while id < min(np.shape(ground_truth)[0] - 1, np.shape(data)[0] - 1):
-            if stamp > ground_truth[id, 0] and stamp < ground_truth[id + 1, 0]:
+        while id < (np.shape(ground_truth)[0] - 1):
+            if stamp >= ground_truth[id, 0] and stamp <= ground_truth[id + 1, 0]:
                 break
             id = id + 1
             # linear interpolation
         time1 = ground_truth[id, 0]
-        time2 = ground_truth[id+ 1, 0]
+        #time2 = ground_truth[id+ 1, 0]
         x1 = ground_truth[id, 1]
-        x2 = ground_truth[id+1, 1]
-        x_gt = linear_interpolation(x1, x2, time1, time2, stamp)
+        #x2 = ground_truth[id+1, 1]
+        x_gt = x1#linear_interpolation(x1, x2, time1, time2, stamp)
 
         y1 = ground_truth[id, 2]
-        y2 = ground_truth[id+1, 2]
-        y_gt = linear_interpolation(y1, y2, time1, time2, stamp)
+        #y2 = ground_truth[id+1, 2]
+        y_gt = y1#linear_interpolation(y1, y2, time1, time2, stamp)
 
         z1 = ground_truth[id, 3]
-        z2 = ground_truth[id+1, 3]
-        z_gt = linear_interpolation(z1, z2, time1, time2, stamp)
+        #z2 = ground_truth[id+1, 3]
+        z_gt = z1#linear_interpolation(z1, z2, time1, time2, stamp)
 
         err = (x_gt- data[i, 1])**2 +  (y_gt- data[i, 2])**2 + (z_gt- data[i, 3])**2
         if(err > max_err):
@@ -73,11 +73,11 @@ def rmse(data, ground_truth):
         cnt = cnt + 1
     return np.sqrt(err_sum/cnt), np.sqrt(max_err)
 
-print('RL: ', real_loops(gt))
+# print('RL: ', real_loops(gt))
 
 print('RMSE Proposed: ', rmse(proposed, gt))
 print('RMSE ORB-SLAM: ', rmse(orbslam, gt))
-print('RMSE SmSLAM: ', rmse(smslam, gt))
+# print('RMSE SmSLAM: ', rmse(smslam, gt))
 
 plt.figure(0)
 plt.plot(proposed[:,1], proposed[:, 2], '-r', label="Proposed Method")

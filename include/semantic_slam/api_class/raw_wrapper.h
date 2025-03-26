@@ -30,6 +30,7 @@
 #include <semantic_slam/algorithm/ocr.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/CompressedImage.h>
 #include <mutex>
 #include <queue>
 #include <thread>
@@ -47,7 +48,7 @@
 #include "LoopQuery.h"
 
 using namespace std;
-typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
+typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::CompressedImage, sensor_msgs::Image> sync_pol;
 
 class RawWrapper{
     public: 
@@ -59,7 +60,7 @@ class RawWrapper{
         ros::NodeHandle nh_;
         ros::NodeHandle pnh_;
         ORB_SLAM3::System* visual_odom_;
-        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> tracking_color_;
+        shared_ptr<message_filters::Subscriber<sensor_msgs::CompressedImage>> tracking_color_;
         shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> tracking_depth_;
         shared_ptr< message_filters::Synchronizer<sync_pol>> tracking_sync_;
 
@@ -73,7 +74,7 @@ class RawWrapper{
         void keyframeCallback();
         tf2_ros::TransformBroadcaster broadcaster_;
 
-        void trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image);
+        void trackingImageCallback(const sensor_msgs::CompressedImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image);
 
         ros::Publisher pub_path_;
 

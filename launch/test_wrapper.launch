@@ -4,8 +4,8 @@
     <node name="test_wrapper" pkg="semantic_slam" type="test_wrapper" output="screen" launch-prefix="xterm -e gdb --args">
         <param name="vocabulary_file" value="$(find semantic_slam)/model/ORBvoc.txt"/>
         <param name="setting_file" value="$(arg setting_file)"/>
-        <param name="rgb_topic" value="/front/color/image_raw"/>
-        <param name="depth_topic" value="/front/aligned_depth_to_color/image_raw"/>
+        <param name="rgb_topic" value="/image_raw/compressed"/>
+        <param name="depth_topic" value="/depth/image_raw"/>
       
     </node>
     <!-- <node name="rviz_slam" pkg="rviz" type="rviz" args="-d $(find orb_semantic_slam)/rviz/config.rviz" launch-prefix="xterm -e gdb args"/> -->

@@ -1,0 +1,28 @@
+<launch>
+    <param name="use_sim_time" value="true"/>
+    <!-- yolo side-->
+
+    <arg name="setting_file" default="$(find semantic_slam)/setting/jackal.yaml"/>
+    <node name="test_semantic_slam" pkg="semantic_slam" type="test_semantic_slam" output="screen">
+        <param name="vocabulary_file" value="$(find semantic_slam)/model/ORBvoc.txt"/>
+        <param name="setting_file" value="$(arg setting_file)"/>
+
+        <param name="door_detection_onnx" value="/home/nuninu98/signage_detection.v1i.yolov8/runs/detect/train/weights/best.onnx"/>
+        
+        <param name="obj_detection_onnx" value="/home/nuninu98/catkin_ws/src/semantic_slam/model/yolov8n.onnx"/>
+        <param name="obj_detection_classes" value="/home/nuninu98/catkin_ws/src/semantic_slam/model/yolov8m-seg.txt"/>
+
+        <!-- <param name="obj_detection_onnx" value="/home/nuninu98/junhyung/runs/segment/train/weights/best.onnx"/>
+        <param name="obj_detection_classes" value="/home/nuninu98/junhyung/runs/segment/train/weights/class.txt"/> -->
+        
+        <param name="rgb_topic" value="/image_raw/compressed"/>
+        <param name="depth_topic" value="/depth/image_raw"/>
+
+        <param name="imu_topic" value="/side/imu"/>
+    
+        <param name="crnn_file" value="/home/nuninu98/Downloads/crnn_cs.onnx"/>
+        <param name="text_list" value="/home/nuninu98/Downloads/alphabet_94.txt"/>  
+    </node>
+    
+    <!-- <node name="rviz_slam" pkg="rviz" type="rviz" args="-d $(find orb_semantic_slam)/rviz/config.rviz" launch-prefix="xterm -e gdb args"/> -->
+</launch>
