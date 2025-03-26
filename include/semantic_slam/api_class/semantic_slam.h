@@ -49,7 +49,7 @@
 using namespace std;
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, yolo_protocol::YoloResult> yolo_sync_pol;
-typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> track_sync_pol;
+typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::CompressedImage, sensor_msgs::Image> track_sync_pol;
 using namespace gtsam::symbol_shorthand;
 class SemanticSLAM{
     private:
@@ -58,7 +58,7 @@ class SemanticSLAM{
         ros::NodeHandle nh_;
         ros::NodeHandle pnh_;
         ORB_SLAM3::System* visual_odom_;
-        shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> tracking_color_;
+        shared_ptr<message_filters::Subscriber<sensor_msgs::CompressedImage>> tracking_color_;
         shared_ptr<message_filters::Subscriber<sensor_msgs::Image>> tracking_depth_;
         shared_ptr< message_filters::Synchronizer<track_sync_pol>> tracking_sync_;
 
@@ -93,7 +93,7 @@ class SemanticSLAM{
         Eigen::Matrix3f K_front_;
         //queue<pair<ros::Time, vector<Detection>>> obj_detection_buf_;
         queue<DetectionGroup> obj_detection_buf_;
-        void trackingImageCallback(const sensor_msgs::ImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image);
+        void trackingImageCallback(const sensor_msgs::CompressedImageConstPtr& rgb_image, const sensor_msgs::ImageConstPtr& depth_image);
         
         void imuCallback(const sensor_msgs::ImuConstPtr& imu);
 
@@ -165,6 +165,8 @@ class SemanticSLAM{
         void recordCallback(const std_msgs::BoolConstPtr& msg);
         
         vector<LoopMatchResult> loops_;
+
+        ros::Publisher pub_calcQuadric_;
     
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW

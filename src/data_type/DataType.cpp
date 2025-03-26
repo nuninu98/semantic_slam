@@ -3,7 +3,7 @@
 
     }
 
-    Detection::Detection(const cv::Rect& roi, const cv::Mat& mask, const string& name): roi_(roi), mask_(mask), name_(name), dg_(nullptr){
+    Detection::Detection(const cv::Rect& roi, const cv::Mat& mask, const string& name): roi_(roi), name_(name), dg_(nullptr){
 
     }
 
@@ -24,7 +24,7 @@
     }
 
     cv::Mat Detection::getMask() const{
-        return mask_;
+        return cv::Mat();
     }
 
     string Detection::getClassName() const{
@@ -62,7 +62,7 @@
         sort(sort_pt.begin(), sort_pt.end(), [](const pcl::PointXYZ& p1, const pcl::PointXYZ& p2){
             return p1.z < p2.z;
         });
-        int max_ = sort_pt.size() * 0.8;
+        int max_ = sort_pt.size();
         for(int i = 0; i < max_; ++i){
             cloud.push_back(sort_pt[i]);
         }
@@ -113,7 +113,30 @@
 
         gtsam::Pose3 pose(transform3.matrix().cast<double>());
         Q_= gtsam_quadrics::ConstrainedDualQuadric(pose, box_dim.cast<double>()/ 2.0);
-        
+        // if(Q_.radii().norm() < 1.0e-3){
+        //     return;
+        // }
+        // gtsam::ISAM2 optim;
+        // gtsam::NonlinearFactorGraph factors;
+        // gtsam::Values values;
+        // Eigen::VectorXd opf_noise_vec = 5.0 * Eigen::VectorXd::Ones(9);
+        // auto init_obj_noise = gtsam::noiseModel::Diagonal::Sigmas(opf_noise_vec);
+        // gtsam::PriorFactor<gtsam_quadrics::ConstrainedDualQuadric> opf(O(0), Q_, init_obj_noise);
+        // values.insert(O(0), Q_);
+        // factors.add(opf);
+        // Eigen::VectorXd pose_noise_vec = 1.0e-6 * Eigen::VectorXd::Ones(6);
+        // auto pose_noise = gtsam::noiseModel::Diagonal::Sigmas(pose_noise_vec);
+        // gtsam::PriorFactor<gtsam::Pose3> ppf(X(0), gtsam::Pose3(Eigen::Matrix4d::Identity()), pose_noise);
+        // values.insert(X(0), gtsam::Pose3(Eigen::Matrix4d::Identity()));
+        // factors.add(ppf);
+        // gtsam::Cal3_S2::shared_ptr K_gtsam(new gtsam::Cal3_S2(K(0, 0), K(1, 1), 0.0, K(0, 2), K(1, 2)));
+        // gtsam::Vector4 bbox_noise_vec(1.0, 1.0, 1.0, 1.0);
+        // auto bbox_noise = gtsam::noiseModel::Diagonal::Sigmas(bbox_noise_vec);
+        // gtsam_quadrics::BoundingBoxFactor bbf(getROI(), K_gtsam, X(0), O(0), bbox_noise, gtsam_quadrics::BoundingBoxFactor::STANDARD);
+        // factors.add(bbf);
+        // optim.update(factors, values);
+        // auto opt_val = optim.calculateEstimate();
+        // Q_ = opt_val.at<gtsam_quadrics::ConstrainedDualQuadric>(O(0));
         //============Depth Quadric (fake)=====================
         auto box_center = getROI().center();
         double box_depth = depth_scaled.at<float>((int)box_center.y(), (int)box_center.x());
@@ -229,7 +252,7 @@
     //=====================DetectionGroup================
     DetectionGroup::DetectionGroup(){}
 
-    DetectionGroup::DetectionGroup(const DetectionGroup& dg) : sensor_pose_(dg.sensor_pose_), detections_(dg.detections_), K_(dg.K_), stamp_(dg.stamp_), kf_(dg.kf_), view_(dg.view_){
+    DetectionGroup::DetectionGroup(const DetectionGroup& dg) : sensor_pose_(dg.sensor_pose_), detections_(dg.detections_), K_(dg.K_), stamp_(dg.stamp_), kf_(dg.kf_)/*, view_(dg.view_)*/{
         for(auto& elem : detections_){
             elem->setDetectionGroup(this);
         }
@@ -282,7 +305,7 @@
         K_=dg.K_;
         stamp_ = dg.stamp_;
         kf_ =dg.kf_;
-        view_ = dg.view_;
+        // view_ = dg.view_;
         //sensor_pose_ = dg.sensor_pose_;
         for(auto& elem : detections_){
             elem->setDetectionGroup(this);

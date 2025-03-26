@@ -32,7 +32,7 @@
 #include <gtsam_quadrics/geometry/DualConic.h>
 #include <gtsam_quadrics/geometry/QuadricCamera.h>
 #include <gtsam_quadrics/geometry/BoundingBoxFactor.h>
-
+using namespace gtsam::symbol_shorthand;
 using namespace std;
 EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
 
@@ -101,7 +101,6 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
         private:
             Object* matched_obj_ = nullptr;
             cv::Rect roi_;
-            cv::Mat mask_;
             string name_;
             DetectionGroup* dg_;
 
@@ -155,7 +154,7 @@ EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Matrix4f)
         
         public:
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW      
-            cv::Mat view_;
+            //cv::Mat view_;
         private:
             double stamp_;
             Eigen::Matrix4f sensor_pose_;
