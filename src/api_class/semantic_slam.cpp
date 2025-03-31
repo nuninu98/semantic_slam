@@ -18,7 +18,7 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     string door_detection_onnx;
     pnh_.param<string>("door_detection_onnx", door_detection_onnx, "");
     vector<string> door_detection_classes = {"floor_sign", "room_number"};
-    door_detector_.reset(new LandmarkDetector(door_detection_onnx, door_detection_classes));
+    //door_detector_.reset(new LandmarkDetector(door_detection_onnx, door_detection_classes));
 
     string obj_detection_onnx;
     pnh_.param<string>("obj_detection_onnx", obj_detection_onnx, "");
@@ -30,10 +30,10 @@ SemanticSLAM::SemanticSLAM(): pnh_("~"), kill_flag_(false), thread_killed_(false
     while(getline(file, line)){
         obj_detection_classes.push_back(line);
     }
-    obj_detector_.reset(new LandmarkDetector(obj_detection_onnx, obj_detection_classes));
+    //obj_detector_.reset(new LandmarkDetector(obj_detection_onnx, obj_detection_classes));
     
 
-    ocr_.reset(new OCR(crnn_file, text_list));
+    // ocr_.reset(new OCR(crnn_file, text_list));
 
     sidecam_in_frontcam_ = Eigen::Matrix4f::Identity();
     sidecam_in_frontcam_(0, 0) = 0.0;
@@ -241,22 +241,22 @@ void SemanticSLAM::detectionImageCallback(const sensor_msgs::ImageConstPtr& dept
     pub_calcQuadric_.publish(Qs);
     for(auto& m : detections){
         //==========Testing Room Number=========
-        if(m->getClassName() == "room_number"){
-            cv::Rect roi = m->getROI_CV();
-            OCRDetection text_out;
-            bool found_txt = ocr_->textRecognition(image, roi, text_out);
-            if(found_txt){
-                m->copyContent(text_out);
-                cv::rectangle(image, roi, cv::Scalar(0, 0, 255), 2);
-                cv::putText(image, m->getClassName(), roi.tl(), 1, 2, cv::Scalar(0, 0, 255));
-            }
-        }
-        else {
+        // if(m->getClassName() == "room_number"){
+        //     cv::Rect roi = m->getROI_CV();
+        //     OCRDetection text_out;
+        //     // bool found_txt = ocr_->textRecognition(image, roi, text_out);
+        //     if(found_txt){
+        //         m->copyContent(text_out);
+        //         cv::rectangle(image, roi, cv::Scalar(0, 0, 255), 2);
+        //         cv::putText(image, m->getClassName(), roi.tl(), 1, 2, cv::Scalar(0, 0, 255));
+        //     }
+        // }
+        // else {
             cv::rectangle(image, m->getROI_CV(), cv::Scalar(0, 0, 255), 2);
             cv::putText(image, m->getClassName(), m->getROI_CV().tl(), 1, 2, cv::Scalar(0, 0, 255));
             cv::rectangle(image, m->getROI_CV(), cv::Scalar(0, 0, 255), 2);
             cv::putText(image, m->getClassName(), m->getROI_CV().tl(), 1, 2, cv::Scalar(0, 0, 255));
-        }
+        //}
     }
     for(auto& obj : h_graph_.getObjects(floor_)){
         gtsam_quadrics::QuadricCamera quadric_cam;

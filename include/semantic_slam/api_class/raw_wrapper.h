@@ -27,7 +27,7 @@
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
 #include <semantic_slam/algorithm/landmark_detector.h>
-#include <semantic_slam/algorithm/ocr.h>
+// #include <semantic_slam/algorithm/ocr.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/CompressedImage.h>
@@ -55,7 +55,7 @@ class RawWrapper{
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     private:
         Eigen::Matrix4f OPTIC_TF = (Eigen::Matrix4f()<< 0, 0, 1, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 1).finished();
-        shared_ptr<OCR> ocr_;
+        // shared_ptr<OCR> ocr_;
 
         ros::NodeHandle nh_;
         ros::NodeHandle pnh_;

@@ -73,7 +73,7 @@ for i in range(len(proposed_loop)):
 
 plt.xlabel('x [m]')
 plt.ylabel('y [m]')
-plt.title('Proposed Method')
+plt.title('Trajectory and Loop Closure of Proposed Method')
 # plt.xlim(-10, 80)
 # plt.ylim(-10, 50)
 plt.legend()

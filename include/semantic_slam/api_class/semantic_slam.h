@@ -26,7 +26,7 @@
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
 #include <semantic_slam/algorithm/landmark_detector.h>
-#include <semantic_slam/algorithm/ocr.h>
+// #include <semantic_slam/algorithm/ocr.h>
 #include <semantic_slam/algorithm/loop_matcher.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -82,7 +82,7 @@ class SemanticSLAM{
 
         ros::Subscriber sub_imu_;
 
-        shared_ptr<OCR> ocr_;
+        // shared_ptr<OCR> ocr_;
 
         mutex imu_lock_;
         

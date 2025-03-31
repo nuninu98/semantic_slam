@@ -37,7 +37,7 @@ RawWrapper::RawWrapper(): pnh_("~"), kf_updated_(false), kill_flag_(false), thre
     tracking_sync_.reset(new message_filters::Synchronizer<sync_pol> (sync_pol(1000), *tracking_color_, *tracking_depth_));
     tracking_sync_->registerCallback(boost::bind(&RawWrapper::trackingImageCallback, this, _1, _2));
     record_sub_ = nh_.subscribe("record_flag", 1000, &RawWrapper::recordCallback, this);
-    ocr_.reset(new OCR("/home/nuninu98/Downloads/crnn_cs.onnx", "/home/nuninu98/Downloads/alphabet_94.txt"));
+    // ocr_.reset(new OCR("/home/nuninu98/Downloads/crnn_cs.onnx", "/home/nuninu98/Downloads/alphabet_94.txt"));
 
 }
 
@@ -173,18 +173,18 @@ void RawWrapper::detectionImageCallback(const yolo_protocol::YoloResultConstPtr&
         cv::Rect roi(cv::Point(detect.bbox.center.x- detect.bbox.size_x/2, detect.bbox.center.y - detect.bbox.size_y/2), cv::Size(detect.bbox.size_x, detect.bbox.size_y));
         cv::Mat mask;
         
-        if(detect.header.frame_id == "room_number"){
-            OCRDetection text_out;
-            bool found_txt = ocr_->textRecognition(image, roi, text_out);
-            if(found_txt){
-                // cv::rectangle(image, roi, cv::Scalar(0, 0, 255), 2);
-                // cv::putText(image, m->getClassName(), roi.tl(), 1, 2, cv::Scalar(0, 0, 255));
-                det_ = Detection(roi, cv::Mat(), text_out.getContent());
-                det_stamp_ = ros::Time::now();
-                det_image_ = image;
-                break;
-            }
-        }
+        // if(detect.header.frame_id == "room_number"){
+        //     OCRDetection text_out;
+        //     bool found_txt = ocr_->textRecognition(image, roi, text_out);
+        //     if(found_txt){
+        //         // cv::rectangle(image, roi, cv::Scalar(0, 0, 255), 2);
+        //         // cv::putText(image, m->getClassName(), roi.tl(), 1, 2, cv::Scalar(0, 0, 255));
+        //         det_ = Detection(roi, cv::Mat(), text_out.getContent());
+        //         det_stamp_ = ros::Time::now();
+        //         det_image_ = image;
+        //         break;
+        //     }
+        // }
     }
     
 }

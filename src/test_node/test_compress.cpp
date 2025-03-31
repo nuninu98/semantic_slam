@@ -1,4 +1,5 @@
-#include <semantic_slam/algorithm/ocr.h>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CompressedImage.h>

@@ -210,7 +210,7 @@ target_link_libraries(semantic_slam_dtype
 
 add_library(semantic_slam_algorithm
   src/algorithm/landmark_detector.cpp
-  src/algorithm/ocr.cpp
+  # src/algorithm/ocr.cpp
   src/algorithm/loop_matcher.cpp
 )
 target_link_libraries(semantic_slam_algorithm
