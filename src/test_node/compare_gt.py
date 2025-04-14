@@ -1,11 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
-proposed = np.loadtxt("/home/nuninu98/proposed.txt")
-proposed_loop = np.loadtxt("/home/nuninu98/proposed_loop.txt")
-orbslam = np.loadtxt("/home/nuninu98/orbslam.txt")
-smslam = np.loadtxt("/home/nuninu98/smslam_jackal.txt")
+proposed = np.loadtxt("/home/nuninu98/gazebo_data/proposed/proposed.txt")
+proposed_loop = np.loadtxt("/home/nuninu98/gazebo_data/proposed/proposed_loop.txt")
+orbslam = np.loadtxt("/home/nuninu98/gazebo_data/orbslam.txt")
+smslam = np.loadtxt("/home/nuninu98/gazebo_data/smslam/smslam_jackal.txt")
 
-gt = np.loadtxt("/home/nuninu98/gt_gazebo.txt")
+gt = np.loadtxt("/home/nuninu98/gazebo_data/gt_gazebo.txt")
 time_min = gt[0, 0]
 time_max = gt[ np.shape(gt)[0] - 1,0]
 print(time_min, time_max)
@@ -79,7 +79,7 @@ print('RMSE Proposed: ', rmse(proposed, gt))
 print('RMSE ORB-SLAM: ', rmse(orbslam, gt))
 # print('RMSE SmSLAM: ', rmse(smslam, gt))
 
-plt.figure(0)
+fig0 = plt.figure(0)
 plt.plot(proposed[:,1], proposed[:, 2], '-r', label="Proposed Method")
 plt.plot(gt[:,1], gt[:, 2], '--k', label="Ground Truth")
 plt.plot(orbslam[:,1], orbslam[:, 2], '-b', label="ORB-SLAM3")
@@ -88,4 +88,5 @@ plt.legend()
 plt.title('Trajectory Comparison')
 plt.xlabel('x[m]')
 plt.ylabel('y[m]')
+fig0.savefig('trajectory_comparison_gazebo.eps', format='eps')
 plt.show()

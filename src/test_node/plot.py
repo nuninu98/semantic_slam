@@ -1,20 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import open3d as o3d
-proposed = np.loadtxt("/home/nuninu98/proposed.txt")
-proposed_loop = np.loadtxt("/home/nuninu98/proposed_loop.txt")
+proposed = np.loadtxt("/home/nuninu98/gazebo_data/proposed/proposed.txt")
+proposed_loop = np.loadtxt("/home/nuninu98/gazebo_data/proposed/proposed_loop.txt")
 proposed_map = o3d.io.read_point_cloud("/home/nuninu98/proposed_map.pcd")
 proposed_map_points = np.asarray(proposed_map.points)
 quadricslam = np.loadtxt('/home/nuninu98/quadricslam.txt')
 
-orbslam = np.loadtxt('/home/nuninu98/orbslam.txt')
-orbslam_loop = np.loadtxt('/home/nuninu98/orbslam_loop.txt')
+orbslam = np.loadtxt('/home/nuninu98/orbslam_gazebo.txt')
+# orbslam_loop = np.loadtxt('/home/nuninu98/orbslam_loop.txt')
 orbslam_map = o3d.io.read_point_cloud("/home/nuninu98/orbslam_map.pcd")
 orbslam_map_points = np.asarray(orbslam_map.points)
 
 smslam = np.loadtxt('/home/nuninu98/data_saves/smslam_lcd.txt')
 #proposed = np.asmatrix(proposed)
-plt.figure(0)
+fig0 = plt.figure(0)
 plt.plot(proposed[:,1], proposed[:, 2], '-y', label="Trajectory", zorder=10)
 #plt.plot(proposed_map_points[:,0], proposed_map_points[:, 1], '.k', label="test", markersize=0.1, alpha=0.8, zorder=0)
 
@@ -74,9 +74,11 @@ for i in range(len(proposed_loop)):
 plt.xlabel('x [m]')
 plt.ylabel('y [m]')
 plt.title('Trajectory and Loop Closure of Proposed Method')
+
 # plt.xlim(-10, 80)
 # plt.ylim(-10, 50)
 plt.legend()
+fig0.savefig('prop_loop.eps', format='eps')
 
 #plt.plot(quadricslam[:,0], quadricslam[:, 1], '-g', label='QuadricSLAM')
 plt.figure(1)
@@ -84,17 +86,17 @@ plt.plot(orbslam[:,1], orbslam[:, 2], '-r', label='Trajectory', zorder=10)
 plt.xlabel('x [m]')
 plt.ylabel('y [m]')
 plt.title('ORB SLAM3 Trajectory')
-for i in range(len(orbslam_loop)):
-    qid = int(orbslam_loop[i, 0]) -1
-    tid = int(orbslam_loop[i, 1]) -1
-    xq = orbslam[qid,1]
-    yq = orbslam[qid,2]
-    xt = orbslam[tid,1]
-    yt = orbslam[tid,2]
-    if i == 0:
-        plt.plot([xq, xt], [yq, yt], '--b', label='Loop Closure')
-    else:
-         plt.plot([xq, xt], [yq, yt], '--b')   
+# for i in range(len(orbslam_loop)):
+#     qid = int(orbslam_loop[i, 0]) -1
+#     tid = int(orbslam_loop[i, 1]) -1
+#     xq = orbslam[qid,1]
+#     yq = orbslam[qid,2]
+#     xt = orbslam[tid,1]
+#     yt = orbslam[tid,2]
+#     if i == 0:
+#         plt.plot([xq, xt], [yq, yt], '--b', label='Loop Closure')
+#     else:
+#          plt.plot([xq, xt], [yq, yt], '--b')   
 
 plt.plot(orbslam_map_points[:,0], orbslam_map_points[:, 1], '.k', label="test", markersize=0.1, alpha=1.0, zorder=0)
 
