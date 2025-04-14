@@ -716,11 +716,11 @@ bool LoopMatcher::matchStep1(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, Eige
         return p1.second > p2.second;
     });
     dets_unique = {dets_sort[0]};
-    for(int i = 1; i < dets_sort.size(); ++i){
-        if(dets_sort[i].second > 0.1){
-            dets_unique.push_back(dets_sort[i]);
-        }
-    }
+    // for(int i = 1; i < dets_sort.size(); ++i){
+    //     if(dets_sort[i].second > 0.1){
+    //         dets_unique.push_back(dets_sort[i]);
+    //     }
+    // }
 
     gtsam::NonlinearFactorGraph base_graph;
     gtsam::Values base_init;
@@ -1117,7 +1117,7 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
     
     score = err;
     double fvec_err = 1000.0;
-    bool same_pattern = patternMatched(visibles_prev, visibles_aft, fvec_err);
+    bool same_pattern = true;//patternMatched(visibles_prev, visibles_aft, fvec_err);
     
     //=============Debug validation===================
     double l1score = L1Score(qkf->bow_vec, tkf->bow_vec);
@@ -1140,7 +1140,7 @@ bool LoopMatcher::matchStep2(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, cons
     string filename = folder + to_string(qkf->id())+"_"+to_string(tkf->id())+"_"+"2ndmatch";
     //cv::imwrite(filename+to_string(err)+"_.png", match_image);
     cout<<"ERR? "<<err<<endl;
-    if(err > 30.0 || !same_pattern){
+    if(err > 300.0 || !same_pattern){
         return false;
     }
     
@@ -1277,13 +1277,13 @@ bool LoopMatcher::patternMatched(unordered_map<Object*, gtsam_quadrics::AlignedB
 
 bool LoopMatcher::match3(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, LoopMatchResult& output){
     unique_lock<mutex> lock(lock_);
-    Eigen::Matrix4d opt_pose = qkf->getPose().cast<double>();
+    Eigen::Matrix4d opt_pose = tkf->getPose().cast<double>();
     vector<pair<Detection*, Object*>> unique_matches;
     cout<<"MATCH "<<qkf->id()<<" "<<tkf->id()<<endl;
-    if(!matchStep1(qkf, tkf, h_graph, opt_pose, unique_matches)){
-        cout<<"failed"<<endl;
-        return false;
-    }
+    // if(!matchStep1(qkf, tkf, h_graph, opt_pose, unique_matches)){
+    //     cout<<"failed"<<endl;
+    //     return false;
+    // }
     
     
     double score = 0.0;
@@ -1292,7 +1292,7 @@ bool LoopMatcher::match3(KeyFrame* qkf, KeyFrame* tkf, HGraph& h_graph, LoopMatc
     output.score = score;
     output.query = qkf->id();
     output.target = tkf->id();
-    output.unique_obj = unique_matches[0].second;
+    output.unique_obj = nullptr;//unique_matches[0].second;
     if(result){
         cout<<"2nd SUCCESS"<<endl;
     }

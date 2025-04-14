@@ -639,7 +639,8 @@ void SemanticSLAM::keyframeCallback(){
             
             if(uscore > 0.1){
                 if(!full_matched){
-                    findSemanticLoopCandidates(new_kf, ceil(1.0 / uscore) + 2, loop_candidates);
+                    //findSemanticLoopCandidates(new_kf, ceil(1.0 / uscore) + 2, loop_candidates);
+                    findSemanticLoopCandidates(new_kf, 10, loop_candidates);
                 }
                 else{
                     //==========For Visualization=============
@@ -651,6 +652,7 @@ void SemanticSLAM::keyframeCallback(){
                             loop_lock_.lock();
                             vector<pair<Detection*, Object*>> v;
                             loops_.push_back(LoopMatchResult(new_kf->id(), kf->id(), Eigen::Matrix4f::Identity(), v, 0.0, u_obj));
+                            TPs_.push_back(LoopMatchResult(new_kf->id(), kf->id(), Eigen::Matrix4f::Identity(), v, 0.0, u_obj));
                             last_loop_ = new_kf->id();
                             loop_lock_.unlock();
                             cout<<"INSERT: "<<kf->id()<<" "<<new_kf->id()<<endl;
@@ -769,7 +771,7 @@ void SemanticSLAM::loopQueryCallback(){
                         
                     }
                     
-                    if(object_uscore.size() >= 3 && qry_dets.size() > 2){
+                    if(object_uscore.size() >= 3 && qry_dets.size() >= 3){
                         LoopMatchResult result;
                         //bool loop_matched = loop_matcher_.match2(qkf, tkf, object_uscore, result);
                        //bool loop_matched = loop_matcher_.match3(qkf, tkf, h_graph_, result);
@@ -788,9 +790,6 @@ void SemanticSLAM::loopQueryCallback(){
                     return lr1.score < lr2.score;
                 });
                 if(!result_sorted.empty()){
-                    // if(result_sorted.size() > 2){
-                    //     cout<<"SCORE1: "<<result_sorted[0].score<<" SCORE2: "<<result_sorted[1].score<<endl;
-                    // }
                     gtsam_lock_.lock();
                     last_loop_ = lq.id_query;
                     auto loop_noise_ = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-3, 1e-3, 1e-3, 1e-2, 1e-2, 1e-2).finished());
@@ -806,6 +805,33 @@ void SemanticSLAM::loopQueryCallback(){
                     }
                     gtsam_lock_.unlock();
                     loops_.push_back(result_sorted[0]);
+                    // KeyFrame* k1 = h_graph_.getKeyFrame(result_sorted[0].target);
+                    // KeyFrame* k2 = h_graph_.getKeyFrame(result_sorted[0].query);
+                    // auto p1 = k1->getPose();
+                    // auto p2 = k2->getPose();
+                    // Eigen::Matrix4f d1 = (p1.inverse() * p2);
+                    // Eigen::Matrix4f d2 = result_sorted[0].drift;
+                    // double delta = (d1.inverse() * d2).block<3, 1>(0, 3).norm();
+                    // Eigen::Quaternionf dq((d1.inverse() * d2).block<3, 3>(0, 0));
+                    // Eigen::AngleAxisf angle;
+                    // angle = dq;
+                    // if(delta < 5.0 && angle.angle() < DEG2RAD(50.0)){
+                    //     cout<<"TP"<<endl;
+                    //     new_factors_.add(lc);
+                    //     for(const auto& corr : result_sorted[0].object_matches){
+                    //         Eigen::Matrix3f K = corr.first->getDetectionGroup()->getIntrinsic();
+                    //         gtsam::Vector4 bbox_noise_vec(50.0, 50.0, 50.0, 50.0);
+                    //         auto bbox_noise = gtsam::noiseModel::Diagonal::Sigmas(bbox_noise_vec);
+                    //         gtsam::Cal3_S2::shared_ptr K_gtsam(new gtsam::Cal3_S2(K(0, 0), K(1, 1), 0.0, K(0, 2), K(1, 2)));
+                    //         gtsam_quadrics::BoundingBoxFactor bbf(corr.first->getROI(), K_gtsam, X(lq.id_query), O(corr.second->id()), bbox_noise, gtsam_quadrics::BoundingBoxFactor::TRUNCATED);
+                    //         new_factors_.add(bbf);
+                    //     }
+                    //     TPs_.push_back(result_sorted[0]);
+                    // }
+                    // else{
+                    //     FPs_.push_back(result_sorted[0]);
+                    //     cout<<"FP"<<endl;
+                    // }
                     cout<<"INSERT: "<<result_sorted[0].target<<" "<<result_sorted[0].query<<endl;
                 }
             }
@@ -1086,7 +1112,7 @@ void SemanticSLAM::recordCallback(const std_msgs::BoolConstPtr& msg){
     if(!boost::filesystem::exists(folder)){
         boost::filesystem::create_directories(folder);
     }
-    string traj_filename = "proposed.txt";
+    string traj_filename = "smslam_jackal.txt";
     ofstream traj_file(folder + traj_filename);
     for(size_t i = 0; i < last_key_->id(); ++i){
         auto kf = h_graph_.getKeyFrame(i);
@@ -1100,9 +1126,45 @@ void SemanticSLAM::recordCallback(const std_msgs::BoolConstPtr& msg){
     string loop_filename= "proposed_loop.txt";
     ofstream loops_file(folder + loop_filename);
     for(size_t i = 0; i < loops_.size(); ++i){
-        auto centroid = loops_[i].unique_obj->Q().pose().matrix().cast<float>();
-        Eigen::Matrix4f se3_centroid = OPTIC_TF * centroid;
-        loops_file<<loops_[i].query<<" "<<loops_[i].target<<" "<<se3_centroid(0, 3)<<" "<<se3_centroid(1, 3)<<" "<<se3_centroid(2, 3)<<endl;
+        // auto centroid = loops_[i].unique_obj->Q().pose().matrix().cast<float>();
+        // Eigen::Matrix4f se3_centroid = OPTIC_TF * centroid;
+        // loops_file<<loops_[i].query<<" "<<loops_[i].target<<" "<<se3_centroid(0, 3)<<" "<<se3_centroid(1, 3)<<" "<<se3_centroid(2, 3)<<endl;
+        if(loops_[i].unique_obj != nullptr){
+            auto centroid = loops_[i].unique_obj->Q().pose().matrix().cast<float>();
+            Eigen::Matrix4f se3_centroid = OPTIC_TF * centroid;
+            loops_file<<loops_[i].query<<" "<<loops_[i].target<<" "<<se3_centroid(0, 3)<<" "<<se3_centroid(1, 3)<<" "<<se3_centroid(2, 3)<<endl;
+        }
+        else{
+            loops_file<<loops_[i].query<<" "<<loops_[i].target<<endl;
+        }
+
+    }
+
+    string tp_filename = "tp_jackal.txt";
+    ofstream tps_file(folder + tp_filename); 
+    for(size_t i = 0; i < TPs_.size(); ++i){
+        if(TPs_[i].unique_obj != nullptr){
+            auto centroid = TPs_[i].unique_obj->Q().pose().matrix().cast<float>();
+            Eigen::Matrix4f se3_centroid = OPTIC_TF * centroid;
+            tps_file<<TPs_[i].query<<" "<<TPs_[i].target<<" "<<se3_centroid(0, 3)<<" "<<se3_centroid(1, 3)<<" "<<se3_centroid(2, 3)<<endl;
+        }
+        else{
+            tps_file<<TPs_[i].query<<" "<<TPs_[i].target<<endl;
+        }
+
+    }
+
+    string fp_filename = "fp_jackal.txt";
+    ofstream fps_file(folder + fp_filename); 
+    for(size_t i = 0; i < FPs_.size(); ++i){
+        if(FPs_[i].unique_obj != nullptr){
+            auto centroid = FPs_[i].unique_obj->Q().pose().matrix().cast<float>();
+            Eigen::Matrix4f se3_centroid = OPTIC_TF * centroid;
+            fps_file<<FPs_[i].query<<" "<<FPs_[i].target<<" "<<se3_centroid(0, 3)<<" "<<se3_centroid(1, 3)<<" "<<se3_centroid(2, 3)<<endl;
+        }
+        else{
+            fps_file<<FPs_[i].query<<" "<<FPs_[i].target<<endl;
+        }
     }
 
     pcl::PointCloud<pcl::PointXYZI>::Ptr map_cloud(new pcl::PointCloud<pcl::PointXYZI>());

@@ -165,6 +165,7 @@ class SemanticSLAM{
         void recordCallback(const std_msgs::BoolConstPtr& msg);
         
         vector<LoopMatchResult> loops_;
+        vector<LoopMatchResult> TPs_, FPs_;
 
         ros::Publisher pub_calcQuadric_;
     
